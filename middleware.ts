@@ -35,9 +35,10 @@ export async function middleware(request: NextRequest) {
   // Rotas públicas que não precisam de autenticação
   const publicRoutes = ["/login"]
   const surveyRoutes = pathname.startsWith("/survey/")
+  const apiRoutes = pathname.startsWith("/api/")
 
-  // Se é uma rota pública ou de survey, permitir acesso
-  if (publicRoutes.includes(pathname) || surveyRoutes) {
+  // Se é uma rota pública, de survey, ou API, permitir acesso
+  if (publicRoutes.includes(pathname) || surveyRoutes || apiRoutes) {
     // Se usuário já está logado e tenta acessar login, redirecionar para dashboard
     if (user && pathname === "/login") {
       const url = request.nextUrl.clone()
@@ -47,7 +48,7 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Para todas as outras rotas, verificar autenticação
+  // Para todas as outras rotas administrativas, verificar autenticação
   if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
