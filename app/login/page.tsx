@@ -71,24 +71,24 @@ export default function LoginPage() {
     }
   }
 
-  // Não renderizar até estar montado (evita hidration mismatch)
+  // Não renderizar até estar montado (evita hydration mismatch)
   if (!mounted) {
     return (
-      <div className="min-h-screen opynia-gradient-subtle flex items-center justify-center">
+      <div className="min-h-screen feind-gradient-subtle flex items-center justify-center">
         <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen opynia-gradient-subtle flex items-center justify-center p-4">
+    <div className="min-h-screen feind-gradient-subtle flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
             <OpyniaLogo size="lg" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold opynia-text-gradient">Login FEIND</CardTitle>
+            <CardTitle className="text-2xl font-bold feind-text-gradient">Login FEIND</CardTitle>
             <CardDescription className="text-gray-600">Acesse sua plataforma de pesquisas</CardDescription>
           </div>
         </CardHeader>
@@ -150,7 +150,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full opynia-button py-3" disabled={loading}>
+            <Button type="submit" className="w-full feind-button py-3" disabled={loading}>
               {loading ? (
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

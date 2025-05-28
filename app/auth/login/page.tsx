@@ -47,21 +47,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen opynia-gradient-subtle flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md border-0 shadow-lg">
+        <CardHeader className="text-center space-y-4 pb-6">
           <div className="flex justify-center">
             <OpyniaLogo size="lg" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold opynia-text-gradient">Login FEIND</CardTitle>
-            <CardDescription className="text-gray-600">Acesse sua plataforma de pesquisas</CardDescription>
+            <CardTitle className="text-2xl font-medium text-gray-900">Entrar na plataforma</CardTitle>
+            <CardDescription className="text-gray-500 mt-1">Acesse sua conta para gerenciar pesquisas</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             {error && (
-              <Alert className="border-red-200 bg-red-50">
+              <Alert className="border-red-100 bg-red-50 mb-4">
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 <AlertDescription className="text-red-800">{error}</AlertDescription>
               </Alert>
@@ -79,7 +79,7 @@ export default function LoginPage() {
                   placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-11 border-gray-200"
                   required
                 />
               </div>
@@ -97,13 +97,17 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-11 border-gray-200"
                   required
                 />
               </div>
             </div>
 
-            <Button type="submit" className="w-full opynia-button" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full h-11 mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={loading}
+            >
               {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>

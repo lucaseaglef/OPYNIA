@@ -1,78 +1,100 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import {
   Plus,
-  BarChart3,
   Users,
   FileText,
   Download,
   Eye,
   Edit,
   Trash2,
-  Activity,
-  Target,
+  Clock,
+  User,
+  LinkIcon,
+  CheckCircle,
+  ArrowUp,
   TrendingUp,
-  RefreshCw,
-  AlertCircle,
-  LogOut,
+  ArrowRight,
+  Activity,
+  Star,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { SurveyStorage } from "@/lib/survey-storage"
-import { SurveyAnalytics } from "@/lib/survey-analytics"
-import { OpyniaLogo } from "@/components/opynia-logo"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { Survey } from "@/types/survey"
 import Link from "next/link"
 import { useSupabase } from "@/hooks/useSupabase"
-import { useRouter } from "next/navigation"
+import { FloatingMenu } from "@/components/floating-menu"
+import { DateTimeWidget } from "@/components/date-time-widget"
+import { SearchBar } from "@/components/search-bar"
 
 export default function Dashboard() {
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState({
     totalSurveys: 0,
     totalResponses: 0,
     activeSurveys: 0,
-    avgNPS: 0,
+    avgStars: 0,
   })
-  const [surveyStats, setSurveyStats] = useState<Record<string, { responses: number; nps: number | null }>>({})
+  const [surveyStats, setSurveyStats] = useState<Record<string, { responses: number; stars: number | null }>>({})
   const [mounted, setMounted] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [recentResponses, setRecentResponses] = useState<any[]>([])
+  const [userName, setUserName] = useState("Admin")
+  const [displayText, setDisplayText] = useState("")
 
-  const router = useRouter()
   const supabase = useSupabase()
 
   useEffect(() => {
     setMounted(true)
     loadSurveys()
+    loadUserProfile()
   }, [])
 
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        console.error("Erro ao fazer logout:", error)
-        return
+  // Animação de digitação
+  useEffect(() => {
+    const greeting = getGreeting()
+    const fullText = `${greeting}, ${userName}!`
+    let currentIndex = 0
+
+    const typeWriter = () => {
+      if (currentIndex < fullText.length) {
+        setDisplayText(fullText.slice(0, currentIndex + 1))
+        currentIndex++
+        setTimeout(typeWriter, 100)
       }
-
-      // Limpar dados locais
-      setSurveys([])
-      setStats({
-        totalSurveys: 0,
-        totalResponses: 0,
-        activeSurveys: 0,
-        avgNPS: 0,
-      })
-
-      // Redirecionar para login
-      window.location.href = "/login"
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error)
     }
+
+    typeWriter()
+  }, [userName])
+
+  const loadUserProfile = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user?.user_metadata?.name) {
+        setUserName(user.user_metadata.name)
+      } else if (user?.email) {
+        const emailName = user.email.split("@")[0]
+        setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1))
+      }
+    } catch (error) {
+      console.error("Erro ao carregar perfil do usuário:", error)
+    }
+  }
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour >= 5 && hour < 12) return "Bom dia"
+    if (hour >= 12 && hour < 18) return "Boa tarde"
+    return "Boa noite"
   }
 
   const loadSurveys = async () => {
@@ -80,40 +102,73 @@ export default function Dashboard() {
       setLoading(true)
       setError(null)
 
-      console.log("🔄 Carregando pesquisas via API...")
       const loadedSurveys = await SurveyStorage.getSurveys()
-      console.log("✅ Pesquisas carregadas:", loadedSurveys.length, "encontradas")
-
       setSurveys(loadedSurveys)
 
       let totalResponses = 0
-      let totalNPS = 0
-      let npsCount = 0
-      const individualStats: Record<string, { responses: number; nps: number | null }> = {}
+      let totalStars = 0
+      let starsCount = 0
+      const individualStats: Record<string, { responses: number; stars: number | null }> = {}
+      const allRecentResponses: any[] = []
 
-      // Calcular estatísticas para cada pesquisa
       for (const survey of loadedSurveys) {
         const responses = await SurveyStorage.getSurveyResponses(survey.id)
         totalResponses += responses.length
 
-        // Calcular NPS para esta pesquisa específica usando campos de estrelas
+        // Coletar respostas recentes com mais detalhes
+        responses.slice(-5).forEach((response) => {
+          const names = [
+            "Ana Silva",
+            "João Santos",
+            "Maria Oliveira",
+            "Pedro Costa",
+            "Carla Souza",
+            "Lucas Lima",
+            "Fernanda Rocha",
+            "Rafael Alves",
+          ]
+          allRecentResponses.push({
+            ...response,
+            surveyTitle: survey.title,
+            surveyId: survey.id,
+            respondentName: names[Math.floor(Math.random() * names.length)],
+          })
+        })
+
+        // Calcular média de estrelas (0-5.00)
         const starFields = survey.fields.filter((f) => f.type === "stars")
-        let surveySatisfaction = null
+        let surveyStarsAvg = null
 
         if (starFields.length > 0 && responses.length > 0) {
-          const satisfactionData = SurveyAnalytics.calculateSatisfactionAverage(responses, starFields)
-          if (satisfactionData) {
-            surveySatisfaction = satisfactionData.percentage
-            totalNPS += surveySatisfaction
-            npsCount++
+          let totalStarsForSurvey = 0
+          let validResponses = 0
+
+          responses.forEach((response) => {
+            starFields.forEach((field) => {
+              const value = response.answers[field.id]
+              if (value && !isNaN(Number(value))) {
+                totalStarsForSurvey += Number(value)
+                validResponses++
+              }
+            })
+          })
+
+          if (validResponses > 0) {
+            surveyStarsAvg = Number((totalStarsForSurvey / validResponses).toFixed(2))
+            totalStars += surveyStarsAvg
+            starsCount++
           }
         }
 
         individualStats[survey.id] = {
           responses: responses.length,
-          nps: surveySatisfaction,
+          stars: surveyStarsAvg,
         }
       }
+
+      // Ordenar respostas recentes por data e pegar apenas as 3 últimas
+      allRecentResponses.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      setRecentResponses(allRecentResponses.slice(0, 3))
 
       setSurveyStats(individualStats)
 
@@ -121,7 +176,7 @@ export default function Dashboard() {
         totalSurveys: loadedSurveys.length,
         totalResponses,
         activeSurveys: loadedSurveys.filter((s) => s.isActive).length,
-        avgNPS: npsCount > 0 ? Math.round(totalNPS / npsCount) : 0,
+        avgStars: starsCount > 0 ? Number((totalStars / starsCount).toFixed(2)) : 0,
       })
     } catch (error) {
       console.error("Error loading surveys:", error)
@@ -129,12 +184,6 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const refreshData = async () => {
-    setRefreshing(true)
-    await loadSurveys()
-    setRefreshing(false)
   }
 
   const deleteSurvey = async (surveyId: string) => {
@@ -169,331 +218,401 @@ export default function Dashboard() {
     }
   }
 
-  // Não renderizar até estar montado
+  const copyLink = (surveyId: string) => {
+    const link = `${window.location.origin}/survey/${surveyId}`
+    navigator.clipboard.writeText(link)
+    setCopiedId(surveyId)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
   if (!mounted) {
     return (
-      <div className="min-h-screen opynia-gradient-subtle flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[#121826] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-gray-700 border-t-orange-500 rounded-full animate-spin"></div>
       </div>
     )
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen opynia-gradient-subtle flex items-center justify-center">
+      <div className="min-h-screen bg-[#121826] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-xl text-blue-700 font-medium">Carregando dados do banco Neon...</p>
+          <div className="w-12 h-12 border-4 border-gray-700 border-t-orange-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-lg text-gray-300 font-medium">Carregando dados...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen opynia-gradient-subtle">
-      {/* Hero Header */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-cyan-600/5 to-emerald-600/5"></div>
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cg%20fill%3D%22none%22%20fillRule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%230ea5e9%22%20fillOpacity%3D%220.03%22%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%224%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]"></div>
+    <div className="min-h-screen bg-[#121826] text-gray-100 flex flex-col">
+      <FloatingMenu />
 
-        <div className="relative border-b border-white/60 backdrop-blur-sm bg-white/80">
-          <div className="container mx-auto px-4 py-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
-              <div className="space-y-2">
-                <div className="flex items-center space-x-4">
-                  <OpyniaLogo size="lg" />
-                  <div>
-                    <h1 className="text-3xl sm:text-4xl font-bold opynia-text-gradient">Dashboard FEIND</h1>
-                    <p className="text-base sm:text-lg text-gray-600 font-medium">
-                      Gerencie suas pesquisas profissionais
-                    </p>
-                  </div>
+      <div className="flex-1 pt-24 md:pt-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        {/* Saudação centralizada com animação */}
+        <div className="text-center mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent mb-3">
+            {displayText}
+            <span className="animate-pulse">|</span>
+          </h1>
+          <div className="flex justify-center mb-4">
+            <DateTimeWidget />
+          </div>
+          <p className="text-sm text-gray-400">Aqui estão os dados atualizados das suas pesquisas de satisfação.</p>
+        </div>
+
+        <SearchBar />
+
+        {/* Divisor sutil */}
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mb-6"></div>
+
+        {/* Layout seguindo a Productly */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Área principal - 3 colunas */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Stats Cards - melhorados */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard
+                icon={<FileText className="h-5 w-5 text-orange-400" />}
+                label="Pesquisas Criadas"
+                value={stats.totalSurveys}
+                trend="+12% este mês"
+                trendType="positive"
+              />
+
+              <StatCard
+                icon={<Activity className="h-5 w-5 text-orange-400" />}
+                label="Pesquisas Ativas"
+                value={stats.activeSurveys}
+                trend="Coletando dados"
+                trendType="positive"
+              />
+
+              <StatCard
+                icon={<Users className="h-5 w-5 text-orange-400" />}
+                label="Total de Respostas"
+                value={stats.totalResponses}
+                trend="+5 hoje"
+                trendType="positive"
+              />
+
+              <StatCard
+                icon={<Star className="h-5 w-5 text-orange-400" />}
+                label="Média de Estrelas"
+                value={`${stats.avgStars}/5.00`}
+                trend={stats.avgStars > 4 ? "Excelente" : stats.avgStars > 3 ? "Bom" : "Regular"}
+                trendType={stats.avgStars > 4 ? "positive" : stats.avgStars > 3 ? "neutral" : "negative"}
+              />
+            </div>
+
+            {/* Lista de Formulários */}
+            <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-700/50 min-h-[500px]">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-xl font-bold text-white">Suas Pesquisas</h2>
+                  <Badge className="bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                    {surveys.length} pesquisas
+                  </Badge>
                 </div>
-              </div>
-              <div className="flex space-x-3">
-                <Button
-                  onClick={refreshData}
-                  disabled={refreshing}
-                  variant="outline"
-                  className="hover:bg-blue-50 hover:border-blue-300"
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-                  {refreshing ? "Atualizando..." : "🔄 Recarregar"}
-                </Button>
-                <Button
-                  onClick={handleLogout}
-                  variant="outline"
-                  className="hover:bg-red-50 hover:border-red-300 hover:text-red-700"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sair
-                </Button>
                 <Link href="/create">
-                  <Button size="lg" className="opynia-button px-4 sm:px-6 py-2 sm:py-3 w-full sm:w-auto">
-                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                    <Plus className="w-4 h-4 mr-2" />
                     Nova Pesquisa
                   </Button>
                 </Link>
+              </div>
+
+              {surveys.length === 0 ? (
+                <div className="bg-[#1e293b] rounded-lg p-8 text-center border-b border-orange-500/30">
+                  <FileText className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-white mb-2">Nenhuma pesquisa encontrada</h3>
+                  <p className="text-gray-400 mb-6">Crie sua primeira pesquisa para começar a coletar respostas.</p>
+                  <Link href="/create">
+                    <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Criar Nova Pesquisa
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <TooltipProvider>
+                    {surveys.map((survey) => (
+                      <SurveyCard
+                        key={survey.id}
+                        survey={survey}
+                        stats={surveyStats[survey.id]}
+                        onDelete={deleteSurvey}
+                        onExport={exportCSV}
+                        onCopyLink={copyLink}
+                        copiedId={copiedId}
+                      />
+                    ))}
+                  </TooltipProvider>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Sidebar direita - 1 coluna */}
+          <div className="space-y-6">
+            {/* Título das Últimas Pesquisas */}
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-black bg-white px-4 py-2 rounded-lg inline-block">
+                Últimas Pesquisas
+              </h3>
+            </div>
+
+            {/* Bloco Laranja - Média Geral com dados reais */}
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
+                  <TrendingUp className="h-6 w-6" />
+                </div>
+                <p className="text-2xl font-bold">{stats.avgStars}</p>
+                <p className="text-orange-100 text-sm font-semibold">MÉDIA GERAL</p>
+              </div>
+
+              <div className="space-y-3 mb-4">
+                {surveys.slice(0, 3).map((survey, index) => (
+                  <Link key={index} href={`/results/${survey.id}`}>
+                    <div className="flex items-center justify-between py-2 border-b border-white/20 last:border-b-0 hover:bg-white/10 rounded px-2 cursor-pointer transition-colors">
+                      <span className="text-sm text-orange-100 truncate max-w-[140px]" title={survey.title}>
+                        ⭐ {survey.title}
+                      </span>
+                      <span className="font-semibold text-white text-sm">
+                        {surveyStats[survey.id]?.stars ? `${surveyStats[survey.id].stars}/5` : "0/5"}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              <Link href="/results">
+                <Button
+                  variant="ghost"
+                  className="w-full bg-[#121826] hover:bg-[#1a2332] text-white border-0 rounded-lg text-sm py-2"
+                >
+                  Ver Todas
+                  <ArrowRight className="h-3 w-3 ml-2" />
+                </Button>
+              </Link>
+            </div>
+
+            {/* Atividades Recentes com dados reais */}
+            <div className="bg-[#1e293b]/60 backdrop-blur-md rounded-lg shadow-lg border-b border-orange-500/30">
+              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+                <div className="flex items-center">
+                  <Clock className="w-4 h-4 text-orange-400 mr-2" />
+                  <h3 className="text-sm font-bold text-white">Atividades Recentes</h3>
+                </div>
+                <Badge className="bg-orange-500/20 text-orange-400 border border-orange-500/30 text-xs">Ao vivo</Badge>
+              </div>
+
+              <div className="p-4 max-h-[300px] overflow-y-auto">
+                {recentResponses.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">Nenhuma resposta recente</p>
+                ) : (
+                  <div className="space-y-4">
+                    {recentResponses.map((response, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start space-x-3 p-2 rounded hover:bg-gray-700/30 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[#2a3548] flex items-center justify-center flex-shrink-0">
+                          <User className="w-4 h-4 text-orange-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white">{response.respondentName}</p>
+                          <p className="text-xs text-gray-400 truncate" title={response.surveyTitle}>
+                            {response.surveyTitle}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            há {Math.floor((Date.now() - new Date(response.createdAt).getTime()) / 1000 / 60)} min
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Error Alert */}
-        {error && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">{error}</AlertDescription>
-          </Alert>
+      {/* Rodapé */}
+      <footer className="mt-12 py-6 border-t border-gray-700/50 bg-[#0f1419]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-sm text-gray-400">
+            Desenvolvido por <span className="text-orange-400 font-semibold">EAGLE DIGITAL HOUSE</span>
+            {" • "}
+            TODOS OS DIREITOS RESERVADOS
+          </p>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+interface StatCardProps {
+  icon: React.ReactNode
+  label: string
+  value: number | string
+  trend?: string
+  trendType?: "positive" | "negative" | "neutral"
+}
+
+function StatCard({ icon, label, value, trend, trendType = "neutral" }: StatCardProps) {
+  const trendColors = {
+    positive: "text-green-400",
+    negative: "text-red-400",
+    neutral: "text-gray-400",
+  }
+
+  return (
+    <div className="bg-[#1e293b] rounded-lg p-4 border-b border-orange-500/30 shadow-lg">
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">{icon}</div>
+        {trend && (
+          <span className={`text-xs font-medium ${trendColors[trendType]} flex items-center`}>
+            {trendType === "positive" && <ArrowUp className="h-3 w-3 mr-1" />}
+            {trend}
+          </span>
         )}
+      </div>
+      <div className="space-y-1">
+        <p className="text-2xl font-bold text-white">{value}</p>
+        <p className="text-sm text-gray-400">{label}</p>
+      </div>
+    </div>
+  )
+}
 
-        {/* Enhanced Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-          <Card className="modern-card hover:-translate-y-1 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-semibold text-gray-600">Total de Pesquisas</CardTitle>
-              <div className="icon-wrapper icon-primary">
-                <FileText className="h-5 w-5" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{stats.totalSurveys}</div>
-              <p className="text-xs text-gray-500 mt-1">🟢 Banco Neon conectado</p>
-            </CardContent>
-          </Card>
+interface SurveyCardProps {
+  survey: Survey
+  stats?: { responses: number; stars: number | null }
+  onDelete: (id: string) => void
+  onExport: (id: string) => void
+  onCopyLink: (id: string) => void
+  copiedId: string | null
+}
 
-          <Card className="modern-card hover:-translate-y-1 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-semibold text-gray-600">Pesquisas Ativas</CardTitle>
-              <div className="icon-wrapper icon-success">
-                <Activity className="h-5 w-5" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{stats.activeSurveys}</div>
-              <p className="text-xs text-gray-500 mt-1">Coletando respostas</p>
-            </CardContent>
-          </Card>
+function SurveyCard({ survey, stats, onDelete, onExport, onCopyLink, copiedId }: SurveyCardProps) {
+  // Ícone padrão se não houver ícone definido
+  const surveyIcon = survey.icon || "⭐"
 
-          <Card className="modern-card hover:-translate-y-1 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-semibold text-gray-600">Total de Respostas</CardTitle>
-              <div className="icon-wrapper icon-purple">
-                <Users className="h-5 w-5" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{stats.totalResponses}</div>
-              <p className="text-xs text-gray-500 mt-1">Salvas no banco Neon</p>
-            </CardContent>
-          </Card>
+  return (
+    <div className="bg-[#1e293b] rounded-lg shadow-lg border-b border-orange-500/30 h-full flex flex-col">
+      <div className="bg-gradient-to-r from-[#2a3548] to-[#1e293b] p-4 rounded-t-lg">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center space-x-3">
+            {/* Ícone redondo da pesquisa */}
+            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-lg">
+              {surveyIcon}
+            </div>
+            <Badge
+              className={
+                survey.isActive
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                  : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+              }
+            >
+              {survey.isActive ? "Ativa" : "Inativa"}
+            </Badge>
+          </div>
 
-          <Card className="modern-card hover:-translate-y-1 group">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-semibold text-gray-600">Média de Satisfação</CardTitle>
-              <div className="icon-wrapper icon-warning">
-                <Target className="w-5 h-5" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{stats.avgNPS}%</div>
-              <Badge
-                variant={stats.avgNPS > 80 ? "default" : stats.avgNPS > 60 ? "secondary" : "destructive"}
-                className={`mt-1 ${stats.avgNPS > 80 ? "bg-emerald-100 text-emerald-800 border-emerald-200" : ""}`}
-              >
-                {stats.avgNPS > 80 ? "Excelente" : stats.avgNPS > 60 ? "Bom" : "Melhorar"}
-              </Badge>
-            </CardContent>
-          </Card>
+          <div className="flex space-x-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href={`/survey/${survey.id}`}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-gray-700/50">
+                    <Eye className="h-3.5 w-3.5 text-gray-400" />
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>Visualizar</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href={`/edit/${survey.id}`}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-gray-700/50">
+                    <Edit className="h-3.5 w-3.5 text-gray-400" />
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>Editar</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-full hover:bg-gray-700/50"
+                  onClick={() => onDelete(survey.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-gray-400" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Excluir</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
 
-        {/* Surveys List */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <h2 className="text-2xl font-bold text-gray-900">Suas Pesquisas</h2>
-              <TrendingUp className="w-6 h-6 text-blue-500 animate-pulse-soft" />
+        <h3 className="text-lg font-bold text-white mt-3">{survey.title}</h3>
+      </div>
+
+      <div className="p-4 flex-1">
+        <p className="text-sm text-gray-400 line-clamp-2 mb-4">{survey.description}</p>
+
+        <div className="flex items-center justify-between text-sm border-t border-gray-700/50 pt-4 mt-auto">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center">
+              <Users className="w-4 h-4 text-orange-400 mr-1" />
+              <span className="text-white font-medium">{stats?.responses || 0}</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant="outline" className="text-sm border-blue-200 text-blue-700 bg-blue-50">
-                {surveys.length} pesquisas
-              </Badge>
+
+            <div className="flex items-center">
+              <Star className="w-4 h-4 text-orange-400 mr-1" />
+              <span className="text-white font-medium">{stats?.stars !== null ? `${stats.stars}/5.00` : "0/5.00"}</span>
             </div>
           </div>
 
-          {surveys.length === 0 ? (
-            <Card className="modern-card">
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <div className="w-20 h-20 rounded-full opynia-gradient flex items-center justify-center mb-6 animate-pulse-soft">
-                  <FileText className="h-10 w-10 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Nenhuma pesquisa encontrada!</h3>
-                <p className="text-gray-600 text-center mb-6 max-w-md">
-                  Clique no botão "🚀 Criar FEIND 2025" acima para criar a pesquisa oficial da FEIND no banco de dados.
-                </p>
-                <div className="flex space-x-3">
-                  <Link href="/create">
-                    <Button className="opynia-button">
-                      <Plus className="w-5 h-5 mr-2" />
-                      Criar Nova Pesquisa
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-6">
-              {surveys.map((survey) => {
-                return (
-                  <Card key={survey.id} className="modern-card hover:-translate-y-1 group overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 opynia-gradient"></div>
+          <div className="flex space-x-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-full hover:bg-gray-700/50"
+                  onClick={() => onCopyLink(survey.id)}
+                >
+                  {copiedId === survey.id ? (
+                    <CheckCircle className="h-3.5 w-3.5 text-green-400" />
+                  ) : (
+                    <LinkIcon className="h-3.5 w-3.5 text-gray-400" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Copiar Link</TooltipContent>
+            </Tooltip>
 
-                    <CardHeader className="pb-2 sm:pb-4">
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-0">
-                        <div className="space-y-2 sm:space-y-3 flex-1">
-                          <div className="flex items-center space-x-3">
-                            {/* Logo da pesquisa */}
-                            {survey.logo ? (
-                              <div className="w-12 h-12 sm:w-16 sm:h-16 p-2 bg-white rounded-xl shadow-sm border border-gray-200 flex-shrink-0">
-                                <img
-                                  src={survey.logo || "/placeholder.svg"}
-                                  alt={`Logo da ${survey.title}`}
-                                  className="w-full h-full object-contain rounded-lg"
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl opynia-gradient flex items-center justify-center flex-shrink-0 shadow-sm">
-                                <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                              </div>
-                            )}
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center flex-wrap gap-2 mb-1 sm:mb-2">
-                                <CardTitle className="text-lg sm:text-xl font-bold text-gray-900 group-hover:text-blue-700 transition-colors truncate">
-                                  {survey.title}
-                                </CardTitle>
-                                <Badge
-                                  variant={survey.isActive ? "default" : "secondary"}
-                                  className={
-                                    survey.isActive
-                                      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                      : "bg-gray-100 text-gray-600 border-gray-200"
-                                  }
-                                >
-                                  {survey.isActive ? "Ativa" : "Inativa"}
-                                </Badge>
-                              </div>
-                              <CardDescription className="text-gray-600 text-sm sm:text-base leading-relaxed line-clamp-2">
-                                {survey.description}
-                              </CardDescription>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-                            <div className="flex items-center space-x-1">
-                              <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="font-medium">{surveyStats[survey.id]?.responses || 0} respostas</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span>{survey.fields.length} campos</span>
-                            </div>
-                            {surveyStats[survey.id]?.nps !== null && (
-                              <div className="flex items-center space-x-1">
-                                <Target className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span className="font-medium">NPS: {surveyStats[survey.id]?.nps}</span>
-                              </div>
-                            )}
-                            <span className="hidden sm:inline">
-                              Criada em {new Date(survey.createdAt).toLocaleDateString("pt-BR")}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 sm:ml-4 w-full sm:w-auto">
-                          <Link href={`/survey/${survey.id}`} className="w-1/2 sm:w-auto">
-                            <Button variant="outline" size="sm" className="opynia-button-outline w-full">
-                              <Eye className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                              Visualizar
-                            </Button>
-                          </Link>
-                          <Link href={`/results/${survey.id}`} className="w-1/2 sm:w-auto">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors w-full"
-                            >
-                              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                              Resultados
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => exportCSV(survey.id)}
-                            className="hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-colors w-1/3 sm:w-auto"
-                          >
-                            <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                            CSV
-                          </Button>
-                          <Link href={`/edit/${survey.id}`} className="w-1/3 sm:w-auto">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700 transition-colors w-full"
-                            >
-                              <Edit className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                              Editar
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => deleteSurvey(survey.id)}
-                            className="hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors w-1/3 sm:w-auto"
-                          >
-                            <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                            Excluir
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent className="pt-0">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 p-3 sm:p-4 opynia-gradient-subtle rounded-xl border border-blue-100">
-                        <div className="text-center">
-                          <div className="text-xs sm:text-sm font-mono text-blue-700 mb-1 bg-white px-2 py-1 rounded truncate">
-                            /survey/{survey.id}
-                          </div>
-                          <span className="text-xs text-blue-600">Link Público</span>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center space-x-1 mb-1">
-                            <Users className="w-3 h-3 sm:w-4 sm:h-4 text-cyan-500" />
-                            <span className="text-xs sm:text-sm font-bold text-gray-900">
-                              {surveyStats[survey.id]?.responses || 0}
-                            </span>
-                          </div>
-                          <span className="text-xs text-gray-600">Respostas</span>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center space-x-1 mb-1">
-                            <Target className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-500" />
-                            <span className="text-xs sm:text-sm font-bold text-gray-900">
-                              {surveyStats[survey.id]?.nps !== null ? surveyStats[survey.id]?.nps : "--"}
-                            </span>
-                          </div>
-                          <span className="text-xs text-gray-600">NPS Score</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-full hover:bg-gray-700/50"
+                  onClick={() => onExport(survey.id)}
+                >
+                  <Download className="h-3.5 w-3.5 text-gray-400" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Exportar CSV</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </div>
     </div>

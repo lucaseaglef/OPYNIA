@@ -9,26 +9,26 @@ interface OpyniaLogoProps {
 export function OpyniaLogo({ size = "md", showText = true, className = "" }: OpyniaLogoProps) {
   const sizeClasses = {
     sm: "w-8 h-8",
-    md: "w-12 h-12",
-    lg: "w-16 h-16",
-    xl: "w-24 h-24",
+    md: "w-10 h-10",
+    lg: "w-12 h-12",
+    xl: "w-16 h-16",
   }
 
   const textSizeClasses = {
     sm: "text-lg",
-    md: "text-2xl",
-    lg: "text-3xl",
-    xl: "text-4xl",
+    md: "text-xl",
+    lg: "text-2xl",
+    xl: "text-3xl",
   }
 
   return (
     <div className={`flex items-center space-x-3 ${className}`}>
       {/* Modern Logo Icon */}
       <div
-        className={`${sizeClasses[size]} opynia-gradient rounded-2xl flex items-center justify-center shadow-lg relative overflow-hidden`}
+        className={`${sizeClasses[size]} bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md relative overflow-hidden`}
       >
         {/* Background pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.2),transparent_70%)]"></div>
 
         {/* Main icon - Modern chart/analytics symbol */}
         <svg
@@ -38,31 +38,33 @@ export function OpyniaLogo({ size = "md", showText = true, className = "" }: Opy
           className="w-2/3 h-2/3 text-white relative z-10"
         >
           {/* Base chart bars */}
-          <rect x="4" y="20" width="4" height="8" rx="2" fill="currentColor" opacity="0.8" />
-          <rect x="10" y="16" width="4" height="12" rx="2" fill="currentColor" />
-          <rect x="16" y="12" width="4" height="16" rx="2" fill="currentColor" />
-          <rect x="22" y="8" width="4" height="20" rx="2" fill="currentColor" opacity="0.9" />
+          <rect x="6" y="18" width="3" height="8" rx="1.5" fill="currentColor" opacity="0.9" />
+          <rect x="12" y="14" width="3" height="12" rx="1.5" fill="currentColor" />
+          <rect x="18" y="10" width="3" height="16" rx="1.5" fill="currentColor" />
+          <rect x="24" y="6" width="3" height="20" rx="1.5" fill="currentColor" opacity="0.9" />
 
           {/* Modern connecting line */}
-          <path d="M6 22L12 18L18 14L24 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
+          <path
+            d="M7.5 20L13.5 16L19.5 12L25.5 8"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            opacity="0.8"
+          />
 
           {/* Accent dots */}
-          <circle cx="6" cy="22" r="2" fill="currentColor" />
-          <circle cx="12" cy="18" r="2" fill="currentColor" />
-          <circle cx="18" cy="14" r="2" fill="currentColor" />
-          <circle cx="24" cy="10" r="2" fill="currentColor" />
+          <circle cx="7.5" cy="20" r="1.5" fill="white" />
+          <circle cx="13.5" cy="16" r="1.5" fill="white" />
+          <circle cx="19.5" cy="12" r="1.5" fill="white" />
+          <circle cx="25.5" cy="8" r="1.5" fill="white" />
         </svg>
       </div>
 
       {/* Logo Text */}
       {showText && (
         <div className="flex flex-col">
-          <h1 className={`${textSizeClasses[size]} font-bold opynia-text-gradient leading-none tracking-tight`}>
-            Opynia
-          </h1>
-          {size !== "sm" && (
-            <p className="text-xs text-gray-600 font-medium tracking-wide uppercase">Survey Platform</p>
-          )}
+          <h1 className={`${textSizeClasses[size]} font-bold text-gray-900 leading-none tracking-tight`}>FEIND</h1>
+          {size !== "sm" && <p className="text-xs text-orange-600 font-medium tracking-wide">Survey Platform</p>}
         </div>
       )}
     </div>
