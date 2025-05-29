@@ -12,9 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { FloatingMenu } from "@/components/floating-menu"
 import Link from "next/link"
 import { useSupabase } from "@/hooks/useSupabase"
-import { Navbar } from "@/components/navbar"
 
 interface AdminUser {
   id: string
@@ -275,11 +275,11 @@ export default function UsersManagement() {
 
   return (
     <div className="min-h-screen bg-[#121826] text-gray-100">
-      <Navbar />
+      <FloatingMenu />
 
-      <div className="pt-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div className="pt-24 md:pt-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 mt-6">
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
             <Link href="/">
               <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">

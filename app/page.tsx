@@ -32,9 +32,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { Survey } from "@/types/survey"
 import Link from "next/link"
 import { useSupabase } from "@/hooks/useSupabase"
+import { FloatingMenu } from "@/components/floating-menu"
 import { DateTimeWidget } from "@/components/date-time-widget"
 import { Input } from "@/components/ui/input"
-import { Navbar } from "@/components/navbar"
 
 export default function Dashboard() {
   const [surveys, setSurveys] = useState<Survey[]>([])
@@ -347,30 +347,27 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#121826] text-gray-100 flex flex-col">
-      <Navbar />
+      <FloatingMenu />
 
-      <div className="flex-1 pt-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        {/* Relógio e saudação com espaçamento adequado */}
-        <div className="text-left mb-8 mt-6">
-          <div className="mb-4">
-            <DateTimeWidget />
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent mb-4">
+      <div className="flex-1 pt-24 md:pt-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        {/* Saudação alinhada à esquerda */}
+        <div className="text-left mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent mb-3">
             {displayText}
             <span className="animate-pulse">|</span>
           </h1>
-          <p className="text-gray-400 text-lg">Aqui estão os dados atualizados das suas pesquisas de satisfação.</p>
+          <div className="flex items-center mb-4">
+            <DateTimeWidget />
+          </div>
+          <p className="text-sm text-gray-400">Aqui estão os dados atualizados das suas pesquisas de satisfação.</p>
         </div>
 
-        {/* Barra divisória acima das métricas */}
-        <div className="w-full h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent mb-8"></div>
-
-        {/* Layout com melhor alinhamento */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Layout seguindo a Productly */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Área principal - 3 colunas */}
-          <div className="lg:col-span-3 space-y-8">
-            {/* Stats Cards com melhor espaçamento */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 space-y-6">
+            {/* Stats Cards - melhorados */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
                 icon={<FileText className="h-6 w-6 text-orange-400" />}
                 label="Pesquisas Criadas"
@@ -404,136 +401,135 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Seção de Pesquisas com título reposicionado */}
-            <div className="bg-[#1a2332]/80 backdrop-blur-sm rounded-xl p-8 border border-gray-700/30 shadow-xl min-h-[500px]">
-              {/* Título acima da barra de busca */}
-              <div className="mb-6">
-                <div className="flex items-center space-x-3 mb-6">
-                  <h2 className="text-2xl font-bold text-white">Suas Pesquisas</h2>
+            {/* Barra de pesquisa e filtros na mesma linha */}
+            <div className="flex items-center gap-4">
+              {/* Barra de pesquisa */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Buscar pesquisas..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-10 bg-[#1e293b] border-gray-600 text-white placeholder-gray-400 focus:border-orange-500 focus:ring-orange-500"
+                />
+                {searchTerm && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400 hover:text-white"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Filtros como ícones */}
+              <div className="flex items-center gap-2">
+                <TooltipProvider>
+                  {/* Filtro de Data */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleFilterClick("date", "week")}
+                        className={`h-10 w-10 rounded-lg ${
+                          activeFilters.date !== "all"
+                            ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                            : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                        }`}
+                      >
+                        <Calendar className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Filtrar por data</TooltipContent>
+                  </Tooltip>
+
+                  {/* Filtro de Status */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleFilterClick("status", "active")}
+                        className={`h-10 w-10 rounded-lg ${
+                          activeFilters.status !== "all"
+                            ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                            : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                        }`}
+                      >
+                        <Tag className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Filtrar por status</TooltipContent>
+                  </Tooltip>
+
+                  {/* Filtro de Avaliação */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleFilterClick("rating", "excellent")}
+                        className={`h-10 w-10 rounded-lg ${
+                          activeFilters.rating !== "all"
+                            ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                            : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                        }`}
+                      >
+                        <Star className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Filtrar por avaliação</TooltipContent>
+                  </Tooltip>
+
+                  {/* Limpar filtros */}
+                  {(searchTerm ||
+                    activeFilters.date !== "all" ||
+                    activeFilters.status !== "all" ||
+                    activeFilters.rating !== "all") && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={clearAllFilters}
+                          className="h-10 w-10 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Limpar filtros</TooltipContent>
+                    </Tooltip>
+                  )}
+                </TooltipProvider>
+              </div>
+            </div>
+
+            {/* Divisor sutil entre filtros e pesquisas */}
+            <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent"></div>
+
+            {/* Lista de Formulários */}
+            <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-700/50 min-h-[500px]">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-xl font-bold text-white">Suas Pesquisas</h2>
                   <Badge className="bg-orange-500/20 text-orange-400 border border-orange-500/30">
                     {filteredSurveys.length} de {surveys.length} pesquisas
                   </Badge>
                 </div>
-
-                {/* Barra de busca e botão Nova Pesquisa alinhados horizontalmente */}
-                <div className="flex items-center gap-4 mb-6">
-                  {/* Barra de pesquisa à esquerda */}
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="Buscar pesquisas..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-10 bg-[#1e293b]/80 border-gray-600/50 text-white placeholder-gray-400 focus:border-orange-500 focus:ring-orange-500/20 h-11"
-                    />
-                    {searchTerm && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSearchTerm("")}
-                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 text-gray-400 hover:text-white"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Filtros */}
-                  <div className="flex items-center gap-2">
-                    <TooltipProvider>
-                      {/* Filtro de Data */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleFilterClick("date", "week")}
-                            className={`h-11 w-11 rounded-lg ${
-                              activeFilters.date !== "all"
-                                ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                                : "text-gray-400 hover:text-white hover:bg-gray-700/50"
-                            }`}
-                          >
-                            <Calendar className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Filtrar por data</TooltipContent>
-                      </Tooltip>
-
-                      {/* Filtro de Status */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleFilterClick("status", "active")}
-                            className={`h-11 w-11 rounded-lg ${
-                              activeFilters.status !== "all"
-                                ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                                : "text-gray-400 hover:text-white hover:bg-gray-700/50"
-                            }`}
-                          >
-                            <Tag className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Filtrar por status</TooltipContent>
-                      </Tooltip>
-
-                      {/* Filtro de Avaliação */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleFilterClick("rating", "excellent")}
-                            className={`h-11 w-11 rounded-lg ${
-                              activeFilters.rating !== "all"
-                                ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                                : "text-gray-400 hover:text-white hover:bg-gray-700/50"
-                            }`}
-                          >
-                            <Star className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Filtrar por avaliação</TooltipContent>
-                      </Tooltip>
-
-                      {/* Limpar filtros */}
-                      {(searchTerm ||
-                        activeFilters.date !== "all" ||
-                        activeFilters.status !== "all" ||
-                        activeFilters.rating !== "all") && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={clearAllFilters}
-                              className="h-11 w-11 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Limpar filtros</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </TooltipProvider>
-                  </div>
-
-                  {/* Botão Nova Pesquisa à direita */}
-                  <Link href="/create">
-                    <Button className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 h-11 font-medium shadow-lg hover:shadow-xl transition-all">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Nova Pesquisa
-                    </Button>
-                  </Link>
-                </div>
+                <Link href="/create">
+                  <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nova Pesquisa
+                  </Button>
+                </Link>
               </div>
 
-              {/* Lista de pesquisas */}
               {filteredSurveys.length === 0 ? (
-                <div className="bg-[#1e293b]/60 rounded-lg p-8 text-center border border-orange-500/20">
+                <div className="bg-[#1e293b] rounded-lg p-8 text-center border border-orange-500/20">
                   <FileText className="h-12 w-12 text-gray-500 mx-auto mb-4" />
                   <h3 className="text-xl font-medium text-white mb-2">
                     {surveys.length === 0 ? "Nenhuma pesquisa encontrada" : "Nenhuma pesquisa corresponde aos filtros"}
@@ -570,17 +566,17 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Sidebar direita com melhor espaçamento */}
-          <div className="space-y-8">
+          {/* Sidebar direita - 1 coluna */}
+          <div className="space-y-6">
             {/* Bloco Laranja integrado com título */}
             <div className="relative">
               {/* Título integrado ao card */}
-              <div className="bg-[#1e293b]/80 backdrop-blur-sm border-t-4 border-orange-500 rounded-t-lg px-6 py-4 text-center">
+              <div className="bg-[#1e293b] border-t border-orange-500 rounded-t-lg px-4 py-3 text-center">
                 <h3 className="text-sm font-semibold text-white">Últimas Pesquisas</h3>
               </div>
 
               {/* Card laranja sem arredondamento superior */}
-              <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-b-xl p-6 text-white shadow-xl">
+              <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-b-xl p-6 text-white shadow-lg">
                 <div className="text-center mb-4">
                   <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
                     <TrendingUp className="h-6 w-6" />
@@ -616,9 +612,9 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Atividades Recentes com melhor design */}
-            <div className="bg-[#1e293b]/80 backdrop-blur-sm rounded-lg shadow-xl border-b-4 border-orange-500 flex flex-col h-[500px]">
-              <div className="p-6 border-b border-gray-700/30 flex items-center justify-between flex-shrink-0">
+            {/* Atividades Recentes - borda laranja na parte inferior */}
+            <div className="bg-[#1e293b]/60 backdrop-blur-md rounded-lg shadow-lg border-b-2 border-orange-500 flex flex-col h-[500px]">
+              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center">
                   <Clock className="w-5 h-5 text-orange-400 mr-2" />
                   <h3 className="text-sm font-semibold text-white">Atividades Recentes</h3>
@@ -626,14 +622,14 @@ export default function Dashboard() {
                 <Badge className="bg-orange-500/20 text-orange-400 border border-orange-500/30 text-xs">Ao vivo</Badge>
               </div>
 
-              <div className="p-6 flex-1 overflow-y-auto">
+              <div className="p-4 flex-1 overflow-y-auto">
                 {recentResponses.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">Nenhuma resposta recente</p>
                 ) : (
                   <div className="space-y-4">
                     {recentResponses.map((response, index) => (
                       <Link key={index} href={`/results/${response.surveyId}`} className="block">
-                        <div className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-700/30 transition-colors">
+                        <div className="flex items-start space-x-3 p-2 rounded hover:bg-gray-700/30 transition-colors">
                           <div className="w-8 h-8 rounded-full bg-[#2a3548] flex items-center justify-center flex-shrink-0">
                             <User className="w-4 h-4 text-orange-400" />
                           </div>
@@ -658,7 +654,7 @@ export default function Dashboard() {
       </div>
 
       {/* Rodapé */}
-      <footer className="mt-16 py-8 border-t border-gray-700/50 bg-[#0f1419]">
+      <footer className="mt-12 py-6 border-t border-gray-700/50 bg-[#0f1419]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-gray-400">
             Desenvolvido por <span className="text-orange-400 font-semibold">EAGLE DIGITAL HOUSE</span>
@@ -687,7 +683,7 @@ function StatCard({ icon, label, value, trend, trendType = "neutral" }: StatCard
   }
 
   return (
-    <div className="bg-[#1e293b]/80 backdrop-blur-sm rounded-lg p-6 border-t-4 border-orange-500 shadow-xl hover:shadow-2xl transition-all duration-300">
+    <div className="bg-[#1e293b] rounded-lg p-6 border-t border-orange-500 shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">{icon}</div>
         {trend && (
@@ -720,7 +716,7 @@ function SurveyCard({ survey, stats, onDelete, onExport, onCopyLink, copiedId }:
 
   return (
     <Link href={`/results/${survey.id}`} className="block h-full">
-      <div className="bg-[#1e293b]/80 backdrop-blur-sm rounded-lg shadow-lg border-b-4 border-orange-500/30 h-full flex flex-col hover:translate-y-[-4px] hover:shadow-xl transition-all duration-300 cursor-pointer">
+      <div className="bg-[#1e293b] rounded-lg shadow-lg border-b border-orange-500/30 h-full flex flex-col hover:translate-y-[-4px] transition-all duration-300 cursor-pointer">
         <div className="bg-gradient-to-r from-[#2a3548] to-[#1e293b] p-4 rounded-t-lg">
           <div className="flex justify-between items-start">
             <div className="flex items-center space-x-3">
