@@ -22,7 +22,7 @@ import {
   PolarRadiusAxis,
   Radar,
 } from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -45,9 +45,10 @@ interface EnhancedChartsProps {
   field: any
   analytics: any
   responses: any[]
+  survey: any
 }
 
-export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsProps) {
+export function EnhancedCharts({ field, analytics, responses, survey }: EnhancedChartsProps) {
   const [viewMode, setViewMode] = useState<"chart" | "table" | "individual">("chart")
 
   const chartTitle = field.label
@@ -55,12 +56,25 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
 
   const renderIndividualResponses = () => {
     const fieldResponses = responses
-      .map((r, index) => ({
-        responseId: r.id,
-        responseIndex: index + 1,
-        answer: r.answers[field.id],
-        submittedAt: r.submittedAt,
-      }))
+      .map((r, index) => {
+        // Encontrar o nome do respondente
+        let respondentName = "Anônimo"
+        for (const fieldId in r.answers) {
+          const surveyField = survey.fields.find((f) => f.id === fieldId)
+          if (surveyField && surveyField.label.toLowerCase().includes("nome") && r.answers[fieldId]) {
+            respondentName = r.answers[fieldId]
+            break
+          }
+        }
+
+        return {
+          responseId: r.id,
+          responseIndex: index + 1,
+          answer: r.answers[field.id],
+          submittedAt: r.submittedAt,
+          respondentName: respondentName,
+        }
+      })
       .filter((r) => r.answer !== undefined && r.answer !== null && r.answer !== "")
 
     return (
@@ -68,16 +82,16 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
         {fieldResponses.map((response, index) => (
           <div
             key={response.responseId}
-            className="p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200 hover:shadow-md transition-all duration-300"
+            className="p-4 bg-[#1e293b] rounded-lg border border-gray-700/50 hover:bg-[#2a3548] transition-all duration-300"
           >
-            <div className="flex items-start justify-between mb-2">
+            <div className="flex items-start justify-between mb-3">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold">
+                <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-bold">
                   {response.responseIndex}
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-900">Resposta #{response.responseIndex}</div>
-                  <div className="text-xs text-gray-500">{new Date(response.submittedAt).toLocaleString("pt-BR")}</div>
+                  <div className="text-sm font-medium text-white">{response.respondentName}</div>
+                  <div className="text-xs text-gray-400">{new Date(response.submittedAt).toLocaleString("pt-BR")}</div>
                 </div>
               </div>
             </div>
@@ -87,12 +101,12 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
                 <div className="flex items-center space-x-2">
                   <div className="flex space-x-1">
                     {Array.from({ length: field.max || 5 }, (_, i) => (
-                      <span key={i} className={`text-lg ${i < response.answer ? "text-amber-400" : "text-gray-300"}`}>
+                      <span key={i} className={`text-lg ${i < response.answer ? "text-amber-400" : "text-gray-600"}`}>
                         ★
                       </span>
                     ))}
                   </div>
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-sm font-medium text-gray-300">
                     {response.answer} de {field.max || 5} estrelas
                   </span>
                 </div>
@@ -100,23 +114,21 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
 
               {field.type === "numeric" && (
                 <div className="flex items-center space-x-3">
-                  <div className="text-2xl font-bold text-blue-600">{response.answer}</div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-2xl font-bold text-blue-400">{response.answer}</div>
+                  <div className="text-sm text-gray-400">
                     de {field.min || 0} a {field.max || 10}
                   </div>
                 </div>
               )}
 
               {["radio", "dropdown"].includes(field.type) && (
-                <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-medium">
-                  {response.answer}
-                </div>
+                <Badge className="bg-blue-500/20 text-blue-300 border border-blue-500/30">{response.answer}</Badge>
               )}
 
               {field.type === "checkbox" && Array.isArray(response.answer) && (
                 <div className="flex flex-wrap gap-2">
                   {response.answer.map((item, i) => (
-                    <Badge key={i} variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    <Badge key={i} className="bg-green-500/20 text-green-300 border border-green-500/30">
                       {item}
                     </Badge>
                   ))}
@@ -124,15 +136,15 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
               )}
 
               {["text", "textarea"].includes(field.type) && (
-                <div className="text-gray-800 leading-relaxed bg-white p-3 rounded-lg border border-gray-200">
+                <div className="text-gray-300 leading-relaxed bg-gray-700/30 p-3 rounded-lg border border-gray-600">
                   {response.answer}
                 </div>
               )}
 
               {field.type === "likert" && (
-                <div className="inline-flex items-center px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium">
+                <Badge className="bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   {response.answer}
-                </div>
+                </Badge>
               )}
             </div>
           </div>
@@ -145,21 +157,21 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
     if (!analytics || !Array.isArray(analytics)) return null
 
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200">
+      <div className="overflow-hidden rounded-lg border border-gray-700">
         <table className="w-full">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-700/50">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Opção</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900">Respostas</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900">Percentual</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900">Barra</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-200">Opção</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-200">Respostas</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-200">Percentual</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-200">Barra</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-700">
             {analytics.map((item: any, index: number) => (
-              <tr key={index} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900 font-medium">{item.name}</td>
-                <td className="px-4 py-3 text-center text-sm font-bold text-gray-900">{item.value}</td>
+              <tr key={index} className="hover:bg-gray-700/30">
+                <td className="px-4 py-3 text-sm text-gray-200 font-medium">{item.name}</td>
+                <td className="px-4 py-3 text-center text-sm font-bold text-white">{item.value}</td>
                 <td className="px-4 py-3 text-center">
                   <Badge
                     variant="outline"
@@ -173,7 +185,7 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
                   </Badge>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-600 rounded-full h-2">
                     <div
                       className="h-2 rounded-full transition-all duration-500"
                       style={{
@@ -199,25 +211,40 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
       case "dropdown":
         return (
           <Tabs defaultValue="bar" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="bar">Barras</TabsTrigger>
-              <TabsTrigger value="pie">Pizza</TabsTrigger>
-              <TabsTrigger value="donut">Rosca</TabsTrigger>
-              <TabsTrigger value="radar">Radar</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4 bg-gray-700/50">
+              <TabsTrigger value="bar" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                Barras
+              </TabsTrigger>
+              <TabsTrigger value="pie" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                Pizza
+              </TabsTrigger>
+              <TabsTrigger value="donut" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                Rosca
+              </TabsTrigger>
+              <TabsTrigger value="radar" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                Radar
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="bar" className="mt-6">
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={analytics} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 12, fill: "#9CA3AF" }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #E5E7EB",
+                      backgroundColor: "#1F2937",
+                      border: "1px solid #374151",
                       borderRadius: "12px",
-                      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
+                      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
+                      color: "#F9FAFB",
                     }}
                     formatter={(value, name) => [
                       `${value} respostas (${analytics.find((d) => d.value === value)?.percentage}%)`,
@@ -250,7 +277,15 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value, name) => [`${value} respostas`, name]} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1F2937",
+                      border: "1px solid #374151",
+                      borderRadius: "12px",
+                      color: "#F9FAFB",
+                    }}
+                    formatter={(value, name) => [`${value} respostas`, name]}
+                  />
                 </RechartsPieChart>
               </ResponsiveContainer>
             </TabsContent>
@@ -273,7 +308,15 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value, name) => [`${value} respostas`, name]} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1F2937",
+                      border: "1px solid #374151",
+                      borderRadius: "12px",
+                      color: "#F9FAFB",
+                    }}
+                    formatter={(value, name) => [`${value} respostas`, name]}
+                  />
                 </RechartsPieChart>
               </ResponsiveContainer>
             </TabsContent>
@@ -281,18 +324,25 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
             <TabsContent value="radar" className="mt-6">
               <ResponsiveContainer width="100%" height={400}>
                 <RadarChart data={analytics}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <PolarRadiusAxis tick={{ fontSize: 10 }} />
+                  <PolarGrid stroke="#374151" />
+                  <PolarAngleAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
+                  <PolarRadiusAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} />
                   <Radar
                     name="Respostas"
                     dataKey="value"
-                    stroke="#3B82F6"
-                    fill="#3B82F6"
+                    stroke="#F59E0B"
+                    fill="#F59E0B"
                     fillOpacity={0.3}
                     strokeWidth={2}
                   />
-                  <Tooltip />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1F2937",
+                      border: "1px solid #374151",
+                      borderRadius: "12px",
+                      color: "#F9FAFB",
+                    }}
+                  />
                 </RadarChart>
               </ResponsiveContainer>
             </TabsContent>
@@ -301,85 +351,127 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
 
       case "stars":
         return (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {/* Métricas principais */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl border border-blue-200">
-                <div className="text-3xl font-bold text-blue-600 mb-1">{analytics.average?.toFixed(1)}</div>
-                <div className="text-sm text-blue-700 font-medium">Média</div>
-                <div className="flex justify-center mt-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="text-center p-6 bg-blue-500/10 rounded-2xl border border-blue-500/20 hover:bg-blue-500/20 transition-all duration-500">
+                <div className="text-4xl font-bold text-blue-400 mb-2">{analytics.average?.toFixed(1)}</div>
+                <div className="text-sm text-blue-300 font-semibold mb-3">Média</div>
+                <div className="flex justify-center mt-3">
                   {Array.from({ length: Math.round(analytics.average || 0) }, (_, i) => (
-                    <span key={i} className="text-amber-400 text-lg">
+                    <span key={i} className="text-amber-400 text-xl">
                       ★
                     </span>
                   ))}
                 </div>
               </div>
-              <div className="text-center p-4 bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl border border-green-200">
-                <div className="text-3xl font-bold text-green-600 mb-1">{analytics.min}</div>
-                <div className="text-sm text-green-700 font-medium">Mínimo</div>
+              <div className="text-center p-6 bg-green-500/10 rounded-2xl border border-green-500/20 hover:bg-green-500/20 transition-all duration-500">
+                <div className="text-4xl font-bold text-green-400 mb-2">{analytics.min}</div>
+                <div className="text-sm text-green-300 font-semibold">Mínimo</div>
               </div>
-              <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-amber-100 rounded-xl border border-orange-200">
-                <div className="text-3xl font-bold text-orange-600 mb-1">{analytics.max}</div>
-                <div className="text-sm text-orange-700 font-medium">Máximo</div>
+              <div className="text-center p-6 bg-orange-500/10 rounded-2xl border border-orange-500/20 hover:bg-orange-500/20 transition-all duration-500">
+                <div className="text-4xl font-bold text-orange-400 mb-2">{analytics.max}</div>
+                <div className="text-sm text-orange-300 font-semibold">Máximo</div>
               </div>
-              <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-violet-100 rounded-xl border border-purple-200">
-                <div className="text-3xl font-bold text-purple-600 mb-1">{analytics.median?.toFixed(1)}</div>
-                <div className="text-sm text-purple-700 font-medium">Mediana</div>
+              <div className="text-center p-6 bg-purple-500/10 rounded-2xl border border-purple-500/20 hover:bg-purple-500/20 transition-all duration-500">
+                <div className="text-4xl font-bold text-purple-400 mb-2">{analytics.median?.toFixed(1)}</div>
+                <div className="text-sm text-purple-300 font-semibold">Mediana</div>
               </div>
             </div>
 
             {/* Gráfico de distribuição */}
             {analytics.distribution && (
-              <Tabs defaultValue="bar" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="bar">Barras</TabsTrigger>
-                  <TabsTrigger value="area">Área</TabsTrigger>
-                  <TabsTrigger value="line">Linha</TabsTrigger>
-                </TabsList>
+              <div className="bg-[#1e293b] rounded-xl p-6 border border-gray-700/50">
+                <h3 className="text-xl text-white font-bold mb-6">Distribuição das Avaliações</h3>
+                <Tabs defaultValue="bar" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 bg-gray-700/50">
+                    <TabsTrigger
+                      value="bar"
+                      className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                    >
+                      Barras
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="area"
+                      className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                    >
+                      Área
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="line"
+                      className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                    >
+                      Linha
+                    </TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="bar" className="mt-6">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={analytics.distribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip formatter={(value, name) => [`${value} respostas`, `${name} estrelas`]} />
-                      <Bar dataKey="value" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </TabsContent>
+                  <TabsContent value="bar" className="mt-8">
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart data={analytics.distribution}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
+                        <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
+                        <Tooltip
+                          formatter={(value, name) => [`${value} respostas`, `${name} estrelas`]}
+                          contentStyle={{
+                            backgroundColor: "#1F2937",
+                            border: "1px solid #374151",
+                            borderRadius: "12px",
+                            color: "#F9FAFB",
+                          }}
+                        />
+                        <Bar dataKey="value" fill="#F59E0B" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </TabsContent>
 
-                <TabsContent value="area" className="mt-6">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={analytics.distribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip formatter={(value, name) => [`${value} respostas`, `${name} estrelas`]} />
-                      <Area type="monotone" dataKey="value" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.3} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </TabsContent>
+                  <TabsContent value="area" className="mt-8">
+                    <ResponsiveContainer width="100%" height={350}>
+                      <AreaChart data={analytics.distribution}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
+                        <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
+                        <Tooltip
+                          formatter={(value, name) => [`${value} respostas`, `${name} estrelas`]}
+                          contentStyle={{
+                            backgroundColor: "#1F2937",
+                            border: "1px solid #374151",
+                            borderRadius: "12px",
+                            color: "#F9FAFB",
+                          }}
+                        />
+                        <Area type="monotone" dataKey="value" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.3} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </TabsContent>
 
-                <TabsContent value="line" className="mt-6">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={analytics.distribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip formatter={(value, name) => [`${value} respostas`, `${name} estrelas`]} />
-                      <Line
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#F59E0B"
-                        strokeWidth={3}
-                        dot={{ fill: "#F59E0B", strokeWidth: 2, r: 6 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </TabsContent>
-              </Tabs>
+                  <TabsContent value="line" className="mt-8">
+                    <ResponsiveContainer width="100%" height={350}>
+                      <LineChart data={analytics.distribution}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
+                        <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
+                        <Tooltip
+                          formatter={(value, name) => [`${value} respostas`, `${name} estrelas`]}
+                          contentStyle={{
+                            backgroundColor: "#1F2937",
+                            border: "1px solid #374151",
+                            borderRadius: "12px",
+                            color: "#F9FAFB",
+                          }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#F59E0B"
+                          strokeWidth={4}
+                          dot={{ fill: "#F59E0B", strokeWidth: 2, r: 8 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </TabsContent>
+                </Tabs>
+              </div>
             )}
           </div>
         )
@@ -389,21 +481,21 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
           <div className="space-y-6">
             {/* Métricas principais */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl border border-blue-200">
-                <div className="text-3xl font-bold text-blue-600 mb-1">{analytics.average?.toFixed(1)}</div>
-                <div className="text-sm text-blue-700 font-medium">Média</div>
+              <div className="text-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                <div className="text-3xl font-bold text-blue-400 mb-1">{analytics.average?.toFixed(1)}</div>
+                <div className="text-sm text-blue-300 font-medium">Média</div>
               </div>
-              <div className="text-center p-4 bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl border border-green-200">
-                <div className="text-3xl font-bold text-green-600 mb-1">{analytics.min}</div>
-                <div className="text-sm text-green-700 font-medium">Mínimo</div>
+              <div className="text-center p-4 bg-green-500/10 rounded-xl border border-green-500/20">
+                <div className="text-3xl font-bold text-green-400 mb-1">{analytics.min}</div>
+                <div className="text-sm text-green-300 font-medium">Mínimo</div>
               </div>
-              <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-amber-100 rounded-xl border border-orange-200">
-                <div className="text-3xl font-bold text-orange-600 mb-1">{analytics.max}</div>
-                <div className="text-sm text-orange-700 font-medium">Máximo</div>
+              <div className="text-center p-4 bg-orange-500/10 rounded-xl border border-orange-500/20">
+                <div className="text-3xl font-bold text-orange-400 mb-1">{analytics.max}</div>
+                <div className="text-sm text-orange-300 font-medium">Máximo</div>
               </div>
-              <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-violet-100 rounded-xl border border-purple-200">
-                <div className="text-3xl font-bold text-purple-600 mb-1">{analytics.median?.toFixed(1)}</div>
-                <div className="text-sm text-purple-700 font-medium">Mediana</div>
+              <div className="text-center p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                <div className="text-3xl font-bold text-purple-400 mb-1">{analytics.median?.toFixed(1)}</div>
+                <div className="text-sm text-purple-300 font-medium">Mediana</div>
               </div>
             </div>
 
@@ -411,10 +503,18 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
             {analytics.distribution && (
               <ResponsiveContainer width="100%" height={350}>
                 <AreaChart data={analytics.distribution}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(value, name) => [`${value} respostas`, `Valor ${name}`]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
+                  <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
+                  <Tooltip
+                    formatter={(value, name) => [`${value} respostas`, `Valor ${name}`]}
+                    contentStyle={{
+                      backgroundColor: "#1F2937",
+                      border: "1px solid #374151",
+                      borderRadius: "12px",
+                      color: "#F9FAFB",
+                    }}
+                  />
                   <Area type="monotone" dataKey="value" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.3} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -428,16 +528,16 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
   }
 
   return (
-    <Card className="modern-card">
-      <CardHeader>
+    <div className="bg-[#1a2332] rounded-xl border border-gray-700/50 overflow-hidden">
+      <CardHeader className="bg-gray-700/30 border-b border-gray-600/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="icon-wrapper icon-primary">
-              <BarChart3 className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-orange-400" />
             </div>
             <div>
-              <CardTitle className="text-lg">{chartTitle}</CardTitle>
-              <div className="text-sm text-gray-600">{chartDescription}</div>
+              <CardTitle className="text-lg text-white">{chartTitle}</CardTitle>
+              <div className="text-sm text-gray-400">{chartDescription}</div>
             </div>
           </div>
 
@@ -446,6 +546,11 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
               variant={viewMode === "chart" ? "default" : "outline"}
               size="sm"
               onClick={() => setViewMode("chart")}
+              className={
+                viewMode === "chart"
+                  ? "bg-orange-500 hover:bg-orange-600 text-white"
+                  : "bg-gray-700 hover:bg-gray-600 text-gray-300 border-gray-600"
+              }
             >
               <BarChart3 className="w-4 h-4 mr-1" />
               Gráficos
@@ -454,6 +559,11 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
               variant={viewMode === "table" ? "default" : "outline"}
               size="sm"
               onClick={() => setViewMode("table")}
+              className={
+                viewMode === "table"
+                  ? "bg-orange-500 hover:bg-orange-600 text-white"
+                  : "bg-gray-700 hover:bg-gray-600 text-gray-300 border-gray-600"
+              }
             >
               <Table className="w-4 h-4 mr-1" />
               Tabela
@@ -462,6 +572,11 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
               variant={viewMode === "individual" ? "default" : "outline"}
               size="sm"
               onClick={() => setViewMode("individual")}
+              className={
+                viewMode === "individual"
+                  ? "bg-orange-500 hover:bg-orange-600 text-white"
+                  : "bg-gray-700 hover:bg-gray-600 text-gray-300 border-gray-600"
+              }
             >
               <Eye className="w-4 h-4 mr-1" />
               Individual
@@ -470,11 +585,11 @@ export function EnhancedCharts({ field, analytics, responses }: EnhancedChartsPr
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="p-6 bg-[#1a2332]">
         {viewMode === "chart" && renderCharts()}
         {viewMode === "table" && renderDataTable()}
         {viewMode === "individual" && renderIndividualResponses()}
       </CardContent>
-    </Card>
+    </div>
   )
 }

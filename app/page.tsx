@@ -20,6 +20,10 @@ import {
   ArrowRight,
   Activity,
   Star,
+  Calendar,
+  Tag,
+  Search,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -28,12 +32,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { Survey } from "@/types/survey"
 import Link from "next/link"
 import { useSupabase } from "@/hooks/useSupabase"
-import { FloatingMenu } from "@/components/floating-menu"
 import { DateTimeWidget } from "@/components/date-time-widget"
-import { SearchBar } from "@/components/search-bar"
+import { Input } from "@/components/ui/input"
+import { Navbar } from "@/components/navbar"
 
 export default function Dashboard() {
   const [surveys, setSurveys] = useState<Survey[]>([])
+  const [filteredSurveys, setFilteredSurveys] = useState<Survey[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState({
@@ -48,6 +53,12 @@ export default function Dashboard() {
   const [recentResponses, setRecentResponses] = useState<any[]>([])
   const [userName, setUserName] = useState("Admin")
   const [displayText, setDisplayText] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [activeFilters, setActiveFilters] = useState({
+    date: "all",
+    status: "all",
+    rating: "all",
+  })
 
   const supabase = useSupabase()
 
@@ -73,6 +84,72 @@ export default function Dashboard() {
 
     typeWriter()
   }, [userName])
+
+  // Filtrar pesquisas
+  useEffect(() => {
+    let filtered = surveys
+
+    // Filtro por termo de busca
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (survey) =>
+          survey.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          survey.description.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    }
+
+    // Filtro por data
+    if (activeFilters.date !== "all") {
+      const now = new Date()
+      const filterDate = new Date()
+
+      switch (activeFilters.date) {
+        case "today":
+          filterDate.setHours(0, 0, 0, 0)
+          break
+        case "week":
+          filterDate.setDate(now.getDate() - 7)
+          break
+        case "month":
+          filterDate.setMonth(now.getMonth() - 1)
+          break
+      }
+
+      filtered = filtered.filter((survey) => new Date(survey.createdAt) >= filterDate)
+    }
+
+    // Filtro por categoria (status)
+    if (activeFilters.status !== "all") {
+      filtered = filtered.filter((survey) => {
+        if (activeFilters.status === "active") return survey.isActive
+        if (activeFilters.status === "inactive") return !survey.isActive
+        return true
+      })
+    }
+
+    // Filtro por avaliação
+    if (activeFilters.rating !== "all") {
+      filtered = filtered.filter((survey) => {
+        const stats = surveyStats[survey.id]
+        if (!stats?.stars) return activeFilters.rating === "no-rating"
+
+        switch (activeFilters.rating) {
+          case "excellent":
+            return stats.stars >= 4.5
+          case "good":
+            return stats.stars >= 3.5 && stats.stars < 4.5
+          case "average":
+            return stats.stars >= 2.5 && stats.stars < 3.5
+          case "poor":
+            return stats.stars < 2.5
+          default:
+            return true
+        }
+      })
+    }
+
+    setFilteredSurveys(filtered)
+  }, [surveys, searchTerm, activeFilters, surveyStats])
 
   const loadUserProfile = async () => {
     try {
@@ -117,21 +194,29 @@ export default function Dashboard() {
 
         // Coletar respostas recentes com mais detalhes
         responses.slice(-5).forEach((response) => {
-          const names = [
-            "Ana Silva",
-            "João Santos",
-            "Maria Oliveira",
-            "Pedro Costa",
-            "Carla Souza",
-            "Lucas Lima",
-            "Fernanda Rocha",
-            "Rafael Alves",
-          ]
+          // Procurar campo de nome na resposta
+          let respondentName = "Anônimo"
+
+          // Procurar por campos que possam conter o nome do respondente
+          for (const fieldId in response.answers) {
+            const field = survey.fields.find((f) => f.id === fieldId)
+            if (field) {
+              // Verificar se o campo tem "nome" no label (case insensitive)
+              if (field.label.toLowerCase().includes("nome") && response.answers[fieldId]) {
+                respondentName = response.answers[fieldId]
+                break
+              }
+            }
+          }
+
           allRecentResponses.push({
-            ...response,
+            id: response.id,
             surveyTitle: survey.title,
             surveyId: survey.id,
-            respondentName: names[Math.floor(Math.random() * names.length)],
+            respondentName: respondentName,
+            submittedAt: response.submittedAt,
+            type: "response",
+            description: `Respondeu "${survey.title}"`,
           })
         })
 
@@ -166,9 +251,9 @@ export default function Dashboard() {
         }
       }
 
-      // Ordenar respostas recentes por data e pegar apenas as 3 últimas
-      allRecentResponses.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      setRecentResponses(allRecentResponses.slice(0, 3))
+      // Ordenar respostas recentes por data e pegar apenas as 4 últimas
+      allRecentResponses.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+      setRecentResponses(allRecentResponses.slice(0, 4))
 
       setSurveyStats(individualStats)
 
@@ -176,7 +261,7 @@ export default function Dashboard() {
         totalSurveys: loadedSurveys.length,
         totalResponses,
         activeSurveys: loadedSurveys.filter((s) => s.isActive).length,
-        avgStars: starsCount > 0 ? Number((totalStars / starsCount).toFixed(2)) : 0,
+        avgStars: starsCount > 0 ? Number((totalStars / starsCount).toFixed(1)) : 0,
       })
     } catch (error) {
       console.error("Error loading surveys:", error)
@@ -184,6 +269,22 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleFilterClick = (filterType: string, value: string) => {
+    setActiveFilters((prev) => ({
+      ...prev,
+      [filterType]: prev[filterType as keyof typeof prev] === value ? "all" : value,
+    }))
+  }
+
+  const clearAllFilters = () => {
+    setSearchTerm("")
+    setActiveFilters({
+      date: "all",
+      status: "all",
+      rating: "all",
+    })
   }
 
   const deleteSurvey = async (surveyId: string) => {
@@ -246,34 +347,32 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#121826] text-gray-100 flex flex-col">
-      <FloatingMenu />
+      <Navbar />
 
-      <div className="flex-1 pt-24 md:pt-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        {/* Saudação centralizada com animação */}
-        <div className="text-center mb-4">
-          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent mb-3">
+      <div className="flex-1 pt-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        {/* Relógio e saudação com espaçamento adequado */}
+        <div className="text-left mb-8 mt-6">
+          <div className="mb-4">
+            <DateTimeWidget />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent mb-4">
             {displayText}
             <span className="animate-pulse">|</span>
           </h1>
-          <div className="flex justify-center mb-4">
-            <DateTimeWidget />
-          </div>
-          <p className="text-sm text-gray-400">Aqui estão os dados atualizados das suas pesquisas de satisfação.</p>
+          <p className="text-gray-400 text-lg">Aqui estão os dados atualizados das suas pesquisas de satisfação.</p>
         </div>
 
-        <SearchBar />
+        {/* Barra divisória acima das métricas */}
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent mb-8"></div>
 
-        {/* Divisor sutil */}
-        <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mb-6"></div>
-
-        {/* Layout seguindo a Productly */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Layout com melhor alinhamento */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Área principal - 3 colunas */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Stats Cards - melhorados */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="lg:col-span-3 space-y-8">
+            {/* Stats Cards com melhor espaçamento */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <StatCard
-                icon={<FileText className="h-5 w-5 text-orange-400" />}
+                icon={<FileText className="h-6 w-6 text-orange-400" />}
                 label="Pesquisas Criadas"
                 value={stats.totalSurveys}
                 trend="+12% este mês"
@@ -281,7 +380,7 @@ export default function Dashboard() {
               />
 
               <StatCard
-                icon={<Activity className="h-5 w-5 text-orange-400" />}
+                icon={<Activity className="h-6 w-6 text-orange-400" />}
                 label="Pesquisas Ativas"
                 value={stats.activeSurveys}
                 trend="Coletando dados"
@@ -289,7 +388,7 @@ export default function Dashboard() {
               />
 
               <StatCard
-                icon={<Users className="h-5 w-5 text-orange-400" />}
+                icon={<Users className="h-6 w-6 text-orange-400" />}
                 label="Total de Respostas"
                 value={stats.totalResponses}
                 trend="+5 hoje"
@@ -297,36 +396,153 @@ export default function Dashboard() {
               />
 
               <StatCard
-                icon={<Star className="h-5 w-5 text-orange-400" />}
-                label="Média de Estrelas"
-                value={`${stats.avgStars}/5.00`}
-                trend={stats.avgStars > 4 ? "Excelente" : stats.avgStars > 3 ? "Bom" : "Regular"}
-                trendType={stats.avgStars > 4 ? "positive" : stats.avgStars > 3 ? "neutral" : "negative"}
+                icon={<Star className="h-6 w-6 text-orange-400" />}
+                label="Nota Média Geral"
+                value={stats.avgStars}
+                trend="de 5.0"
+                trendType="neutral"
               />
             </div>
 
-            {/* Lista de Formulários */}
-            <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-700/50 min-h-[500px]">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <h2 className="text-xl font-bold text-white">Suas Pesquisas</h2>
+            {/* Seção de Pesquisas com título reposicionado */}
+            <div className="bg-[#1a2332]/80 backdrop-blur-sm rounded-xl p-8 border border-gray-700/30 shadow-xl min-h-[500px]">
+              {/* Título acima da barra de busca */}
+              <div className="mb-6">
+                <div className="flex items-center space-x-3 mb-6">
+                  <h2 className="text-2xl font-bold text-white">Suas Pesquisas</h2>
                   <Badge className="bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                    {surveys.length} pesquisas
+                    {filteredSurveys.length} de {surveys.length} pesquisas
                   </Badge>
                 </div>
-                <Link href="/create">
-                  <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Nova Pesquisa
-                  </Button>
-                </Link>
+
+                {/* Barra de busca e botão Nova Pesquisa alinhados horizontalmente */}
+                <div className="flex items-center gap-4 mb-6">
+                  {/* Barra de pesquisa à esquerda */}
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      type="text"
+                      placeholder="Buscar pesquisas..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 pr-10 bg-[#1e293b]/80 border-gray-600/50 text-white placeholder-gray-400 focus:border-orange-500 focus:ring-orange-500/20 h-11"
+                    />
+                    {searchTerm && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 text-gray-400 hover:text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Filtros */}
+                  <div className="flex items-center gap-2">
+                    <TooltipProvider>
+                      {/* Filtro de Data */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleFilterClick("date", "week")}
+                            className={`h-11 w-11 rounded-lg ${
+                              activeFilters.date !== "all"
+                                ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                                : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                            }`}
+                          >
+                            <Calendar className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Filtrar por data</TooltipContent>
+                      </Tooltip>
+
+                      {/* Filtro de Status */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleFilterClick("status", "active")}
+                            className={`h-11 w-11 rounded-lg ${
+                              activeFilters.status !== "all"
+                                ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                                : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                            }`}
+                          >
+                            <Tag className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Filtrar por status</TooltipContent>
+                      </Tooltip>
+
+                      {/* Filtro de Avaliação */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleFilterClick("rating", "excellent")}
+                            className={`h-11 w-11 rounded-lg ${
+                              activeFilters.rating !== "all"
+                                ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                                : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                            }`}
+                          >
+                            <Star className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Filtrar por avaliação</TooltipContent>
+                      </Tooltip>
+
+                      {/* Limpar filtros */}
+                      {(searchTerm ||
+                        activeFilters.date !== "all" ||
+                        activeFilters.status !== "all" ||
+                        activeFilters.rating !== "all") && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={clearAllFilters}
+                              className="h-11 w-11 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Limpar filtros</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </TooltipProvider>
+                  </div>
+
+                  {/* Botão Nova Pesquisa à direita */}
+                  <Link href="/create">
+                    <Button className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 h-11 font-medium shadow-lg hover:shadow-xl transition-all">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nova Pesquisa
+                    </Button>
+                  </Link>
+                </div>
               </div>
 
-              {surveys.length === 0 ? (
-                <div className="bg-[#1e293b] rounded-lg p-8 text-center border-b border-orange-500/30">
+              {/* Lista de pesquisas */}
+              {filteredSurveys.length === 0 ? (
+                <div className="bg-[#1e293b]/60 rounded-lg p-8 text-center border border-orange-500/20">
                   <FileText className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-white mb-2">Nenhuma pesquisa encontrada</h3>
-                  <p className="text-gray-400 mb-6">Crie sua primeira pesquisa para começar a coletar respostas.</p>
+                  <h3 className="text-xl font-medium text-white mb-2">
+                    {surveys.length === 0 ? "Nenhuma pesquisa encontrada" : "Nenhuma pesquisa corresponde aos filtros"}
+                  </h3>
+                  <p className="text-gray-400 mb-6">
+                    {surveys.length === 0
+                      ? "Crie sua primeira pesquisa para começar a coletar respostas."
+                      : "Tente ajustar os filtros ou criar uma nova pesquisa."}
+                  </p>
                   <Link href="/create">
                     <Button className="bg-orange-500 hover:bg-orange-600 text-white">
                       <Plus className="w-4 h-4 mr-2" />
@@ -337,7 +553,7 @@ export default function Dashboard() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <TooltipProvider>
-                    {surveys.map((survey) => (
+                    {filteredSurveys.map((survey) => (
                       <SurveyCard
                         key={survey.id}
                         survey={survey}
@@ -354,84 +570,84 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Sidebar direita - 1 coluna */}
-          <div className="space-y-6">
-            {/* Título das Últimas Pesquisas */}
-            <div className="text-center">
-              <h3 className="text-lg font-bold text-black bg-white px-4 py-2 rounded-lg inline-block">
-                Últimas Pesquisas
-              </h3>
-            </div>
+          {/* Sidebar direita com melhor espaçamento */}
+          <div className="space-y-8">
+            {/* Bloco Laranja integrado com título */}
+            <div className="relative">
+              {/* Título integrado ao card */}
+              <div className="bg-[#1e293b]/80 backdrop-blur-sm border-t-4 border-orange-500 rounded-t-lg px-6 py-4 text-center">
+                <h3 className="text-sm font-semibold text-white">Últimas Pesquisas</h3>
+              </div>
 
-            {/* Bloco Laranja - Média Geral com dados reais */}
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
-              <div className="text-center mb-4">
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
-                  <TrendingUp className="h-6 w-6" />
+              {/* Card laranja sem arredondamento superior */}
+              <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-b-xl p-6 text-white shadow-xl">
+                <div className="text-center mb-4">
+                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
+                    <TrendingUp className="h-6 w-6" />
+                  </div>
+                  <p className="text-2xl font-bold">{stats.avgStars}</p>
+                  <p className="text-orange-100 text-sm font-semibold">MÉDIA GERAL</p>
                 </div>
-                <p className="text-2xl font-bold">{stats.avgStars}</p>
-                <p className="text-orange-100 text-sm font-semibold">MÉDIA GERAL</p>
-              </div>
 
-              <div className="space-y-3 mb-4">
-                {surveys.slice(0, 3).map((survey, index) => (
-                  <Link key={index} href={`/results/${survey.id}`}>
-                    <div className="flex items-center justify-between py-2 border-b border-white/20 last:border-b-0 hover:bg-white/10 rounded px-2 cursor-pointer transition-colors">
-                      <span className="text-sm text-orange-100 truncate max-w-[140px]" title={survey.title}>
-                        ⭐ {survey.title}
-                      </span>
-                      <span className="font-semibold text-white text-sm">
-                        {surveyStats[survey.id]?.stars ? `${surveyStats[survey.id].stars}/5` : "0/5"}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+                <div className="space-y-3 mb-4">
+                  {surveys.slice(0, 3).map((survey, index) => (
+                    <Link key={index} href={`/results/${survey.id}`}>
+                      <div className="flex items-center justify-between py-2 border-b border-white/20 last:border-b-0 hover:bg-white/10 rounded px-2 cursor-pointer transition-colors">
+                        <span className="text-sm text-orange-100 truncate max-w-[140px]" title={survey.title}>
+                          ⭐ {survey.title}
+                        </span>
+                        <span className="font-semibold text-white text-sm">
+                          {surveyStats[survey.id]?.stars ? `${surveyStats[survey.id].stars}/5` : "0/5"}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
 
-              <Link href="/results">
-                <Button
-                  variant="ghost"
-                  className="w-full bg-[#121826] hover:bg-[#1a2332] text-white border-0 rounded-lg text-sm py-2"
-                >
-                  Ver Todas
-                  <ArrowRight className="h-3 w-3 ml-2" />
-                </Button>
-              </Link>
+                <Link href="/surveys">
+                  <Button
+                    variant="ghost"
+                    className="w-full bg-[#121826] hover:bg-[#1a2332] text-white border-0 rounded-lg text-sm py-2"
+                  >
+                    Ver Todas
+                    <ArrowRight className="h-3 w-3 ml-2" />
+                  </Button>
+                </Link>
+              </div>
             </div>
 
-            {/* Atividades Recentes com dados reais */}
-            <div className="bg-[#1e293b]/60 backdrop-blur-md rounded-lg shadow-lg border-b border-orange-500/30">
-              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+            {/* Atividades Recentes com melhor design */}
+            <div className="bg-[#1e293b]/80 backdrop-blur-sm rounded-lg shadow-xl border-b-4 border-orange-500 flex flex-col h-[500px]">
+              <div className="p-6 border-b border-gray-700/30 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center">
-                  <Clock className="w-4 h-4 text-orange-400 mr-2" />
-                  <h3 className="text-sm font-bold text-white">Atividades Recentes</h3>
+                  <Clock className="w-5 h-5 text-orange-400 mr-2" />
+                  <h3 className="text-sm font-semibold text-white">Atividades Recentes</h3>
                 </div>
                 <Badge className="bg-orange-500/20 text-orange-400 border border-orange-500/30 text-xs">Ao vivo</Badge>
               </div>
 
-              <div className="p-4 max-h-[300px] overflow-y-auto">
+              <div className="p-6 flex-1 overflow-y-auto">
                 {recentResponses.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">Nenhuma resposta recente</p>
                 ) : (
                   <div className="space-y-4">
                     {recentResponses.map((response, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start space-x-3 p-2 rounded hover:bg-gray-700/30 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-[#2a3548] flex items-center justify-center flex-shrink-0">
-                          <User className="w-4 h-4 text-orange-400" />
+                      <Link key={index} href={`/results/${response.surveyId}`} className="block">
+                        <div className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-700/30 transition-colors">
+                          <div className="w-8 h-8 rounded-full bg-[#2a3548] flex items-center justify-center flex-shrink-0">
+                            <User className="w-4 h-4 text-orange-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white">{response.respondentName}</p>
+                            <p className="text-xs text-gray-400 truncate" title={response.surveyTitle}>
+                              {response.surveyTitle}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(response.submittedAt).toLocaleString("pt-BR")}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white">{response.respondentName}</p>
-                          <p className="text-xs text-gray-400 truncate" title={response.surveyTitle}>
-                            {response.surveyTitle}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            há {Math.floor((Date.now() - new Date(response.createdAt).getTime()) / 1000 / 60)} min
-                          </p>
-                        </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 )}
@@ -442,7 +658,7 @@ export default function Dashboard() {
       </div>
 
       {/* Rodapé */}
-      <footer className="mt-12 py-6 border-t border-gray-700/50 bg-[#0f1419]">
+      <footer className="mt-16 py-8 border-t border-gray-700/50 bg-[#0f1419]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-gray-400">
             Desenvolvido por <span className="text-orange-400 font-semibold">EAGLE DIGITAL HOUSE</span>
@@ -471,9 +687,9 @@ function StatCard({ icon, label, value, trend, trendType = "neutral" }: StatCard
   }
 
   return (
-    <div className="bg-[#1e293b] rounded-lg p-4 border-b border-orange-500/30 shadow-lg">
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">{icon}</div>
+    <div className="bg-[#1e293b]/80 backdrop-blur-sm rounded-lg p-6 border-t-4 border-orange-500 shadow-xl hover:shadow-2xl transition-all duration-300">
+      <div className="flex items-center justify-between mb-4">
+        <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">{icon}</div>
         {trend && (
           <span className={`text-xs font-medium ${trendColors[trendType]} flex items-center`}>
             {trendType === "positive" && <ArrowUp className="h-3 w-3 mr-1" />}
@@ -481,9 +697,9 @@ function StatCard({ icon, label, value, trend, trendType = "neutral" }: StatCard
           </span>
         )}
       </div>
-      <div className="space-y-1">
-        <p className="text-2xl font-bold text-white">{value}</p>
-        <p className="text-sm text-gray-400">{label}</p>
+      <div className="space-y-2">
+        <p className="text-3xl font-black text-white tracking-tight">{value}</p>
+        <p className="text-sm text-gray-400 font-medium">{label}</p>
       </div>
     </div>
   )
@@ -503,118 +719,143 @@ function SurveyCard({ survey, stats, onDelete, onExport, onCopyLink, copiedId }:
   const surveyIcon = survey.icon || "⭐"
 
   return (
-    <div className="bg-[#1e293b] rounded-lg shadow-lg border-b border-orange-500/30 h-full flex flex-col">
-      <div className="bg-gradient-to-r from-[#2a3548] to-[#1e293b] p-4 rounded-t-lg">
-        <div className="flex justify-between items-start">
-          <div className="flex items-center space-x-3">
-            {/* Ícone redondo da pesquisa */}
-            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-lg">
-              {surveyIcon}
+    <Link href={`/results/${survey.id}`} className="block h-full">
+      <div className="bg-[#1e293b]/80 backdrop-blur-sm rounded-lg shadow-lg border-b-4 border-orange-500/30 h-full flex flex-col hover:translate-y-[-4px] hover:shadow-xl transition-all duration-300 cursor-pointer">
+        <div className="bg-gradient-to-r from-[#2a3548] to-[#1e293b] p-4 rounded-t-lg">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center space-x-3">
+              {/* Ícone redondo da pesquisa */}
+              <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-lg">
+                {surveyIcon}
+              </div>
+              <Badge
+                className={
+                  survey.isActive
+                    ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                    : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+                }
+              >
+                {survey.isActive ? "Ativa" : "Inativa"}
+              </Badge>
             </div>
-            <Badge
-              className={
-                survey.isActive
-                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                  : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
-              }
-            >
-              {survey.isActive ? "Ativa" : "Inativa"}
-            </Badge>
-          </div>
 
-          <div className="flex space-x-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href={`/survey/${survey.id}`}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-gray-700/50">
+            <div className="flex space-x-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-full hover:bg-gray-700/50"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      window.open(`/survey/${survey.id}`, "_blank")
+                    }}
+                  >
                     <Eye className="h-3.5 w-3.5 text-gray-400" />
                   </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent>Visualizar</TooltipContent>
-            </Tooltip>
+                </TooltipTrigger>
+                <TooltipContent>Visualizar</TooltipContent>
+              </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href={`/edit/${survey.id}`}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-gray-700/50">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-full hover:bg-gray-700/50"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      window.location.href = `/edit/${survey.id}`
+                    }}
+                  >
                     <Edit className="h-3.5 w-3.5 text-gray-400" />
                   </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent>Editar</TooltipContent>
-            </Tooltip>
+                </TooltipTrigger>
+                <TooltipContent>Editar</TooltipContent>
+              </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 rounded-full hover:bg-gray-700/50"
-                  onClick={() => onDelete(survey.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5 text-gray-400" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Excluir</TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-
-        <h3 className="text-lg font-bold text-white mt-3">{survey.title}</h3>
-      </div>
-
-      <div className="p-4 flex-1">
-        <p className="text-sm text-gray-400 line-clamp-2 mb-4">{survey.description}</p>
-
-        <div className="flex items-center justify-between text-sm border-t border-gray-700/50 pt-4 mt-auto">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center">
-              <Users className="w-4 h-4 text-orange-400 mr-1" />
-              <span className="text-white font-medium">{stats?.responses || 0}</span>
-            </div>
-
-            <div className="flex items-center">
-              <Star className="w-4 h-4 text-orange-400 mr-1" />
-              <span className="text-white font-medium">{stats?.stars !== null ? `${stats.stars}/5.00` : "0/5.00"}</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-full hover:bg-gray-700/50"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      onDelete(survey.id)
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-gray-400" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Excluir</TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
-          <div className="flex space-x-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 rounded-full hover:bg-gray-700/50"
-                  onClick={() => onCopyLink(survey.id)}
-                >
-                  {copiedId === survey.id ? (
-                    <CheckCircle className="h-3.5 w-3.5 text-green-400" />
-                  ) : (
-                    <LinkIcon className="h-3.5 w-3.5 text-gray-400" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Copiar Link</TooltipContent>
-            </Tooltip>
+          <h3 className="text-lg font-bold text-white mt-3">{survey.title}</h3>
+        </div>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 rounded-full hover:bg-gray-700/50"
-                  onClick={() => onExport(survey.id)}
-                >
-                  <Download className="h-3.5 w-3.5 text-gray-400" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Exportar CSV</TooltipContent>
-            </Tooltip>
+        <div className="p-4 flex-1">
+          <p className="text-sm text-gray-400 line-clamp-2 mb-4">{survey.description}</p>
+
+          <div className="flex items-center justify-between text-sm border-t border-gray-700/50 pt-4 mt-auto">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <Users className="w-4 h-4 text-orange-400 mr-1" />
+                <span className="text-white font-medium">{stats?.responses || 0}</span>
+              </div>
+
+              <div className="flex items-center">
+                <Star className="w-4 h-4 text-orange-400 mr-1" />
+                <span className="text-white font-medium">
+                  {stats?.stars !== null ? `${stats.stars}/5.00` : "0/5.00"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex space-x-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-full hover:bg-gray-700/50"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      onCopyLink(survey.id)
+                    }}
+                  >
+                    {copiedId === survey.id ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-400" />
+                    ) : (
+                      <LinkIcon className="h-3.5 w-3.5 text-gray-400" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copiar Link</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-full hover:bg-gray-700/50"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      onExport(survey.id)
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5 text-gray-400" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Exportar CSV</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   )
 }

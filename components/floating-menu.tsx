@@ -1,5 +1,5 @@
 "use client"
-import { Home, BarChart3, Search, LogOut, Settings } from "lucide-react"
+import { Home, BarChart3, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useSupabase } from "@/hooks/useSupabase"
@@ -39,7 +39,7 @@ export function FloatingMenu() {
               </Button>
             </Link>
 
-            <Link href="/create">
+            <Link href="/surveys">
               <Button
                 variant="ghost"
                 size="sm"
@@ -66,10 +66,16 @@ export function FloatingMenu() {
               </Button>
             </Link>
 
-            <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:scale-105 transition-all">
-              <Settings className="w-4 h-4 mr-2" />
-              Config
-            </Button>
+            <Link href="/settings">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-gray-300 hover:text-white hover:scale-105 transition-all"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Config
+              </Button>
+            </Link>
 
             <Button
               variant="ghost"
@@ -89,14 +95,16 @@ export function FloatingMenu() {
         <div className="flex items-center justify-between px-4 py-3">
           <span className="text-xl font-bold text-orange-500">FEIND</span>
           <div className="flex items-center space-x-2">
-            <Link href="/create">
+            <Link href="/surveys">
               <Button variant="ghost" size="icon" className="text-gray-300">
                 <BarChart3 className="w-4 h-4" />
               </Button>
             </Link>
-            <Button variant="ghost" size="icon" className="text-gray-300">
-              <Search className="w-4 h-4" />
-            </Button>
+            <Link href="/settings">
+              <Button variant="ghost" size="icon" className="text-gray-300">
+                <Settings className="w-4 h-4" />
+              </Button>
+            </Link>
             <Button variant="ghost" size="icon" onClick={handleLogout} className="text-gray-300">
               <LogOut className="w-4 h-4 text-orange-400" />
             </Button>
