@@ -1,12 +1,24 @@
 import { NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
 
+const FEIND_2025_SURVEY_ID = "feind_2025_official_v1" // Fixed ID
+
 export async function POST() {
   const sql = neon(process.env.DATABASE_URL!)
 
   try {
-    // Criar a pesquisa FEIND 2025 única e funcional
-    const surveyId = `feind_2025_${Date.now()}`
+    // Check if the FEIND 2025 survey already exists
+    const existingSurveyResult = await sql`
+      SELECT id FROM surveys.surveys WHERE id = ${FEIND_2025_SURVEY_ID}
+    `
+
+    if (existingSurveyResult.length > 0) {
+      return NextResponse.json({
+        success: true,
+        message: "Pesquisa FEIND 2025 já inicializada.",
+        surveyId: FEIND_2025_SURVEY_ID,
+      })
+    }
 
     const fields = [
       {
@@ -45,7 +57,7 @@ export async function POST() {
         description: "Telefone para contato (opcional)",
         required: false,
         validation: {
-          pattern: "^$$[0-9]{2}$$\\s[0-9]{4,5}-[0-9]{4}$",
+          pattern: "^$$\\d{2}$$\\s\\d{4,5}-\\d{4}$", // Corrected pattern
           mask: "(99) 99999-9999",
         },
       },
@@ -250,7 +262,7 @@ export async function POST() {
         is_active, 
         created_at
       ) VALUES (
-        ${surveyId},
+        ${FEIND_2025_SURVEY_ID},
         'Pesquisa de Satisfação – FEIND 2025',
         'Sua opinião é fundamental para aprimorarmos a próxima edição da FEIND. Compartilhe sua experiência conosco e nos ajude a construir um evento ainda melhor.',
         '',
@@ -263,7 +275,7 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       message: "Pesquisa FEIND 2025 criada com sucesso!",
-      surveyId,
+      surveyId: FEIND_2025_SURVEY_ID,
     })
   } catch (error) {
     console.error("Erro ao criar pesquisa FEIND:", error)

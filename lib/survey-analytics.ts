@@ -136,7 +136,6 @@ export class SurveyAnalytics {
       max,
       count: numericAnswers.length,
       distribution: chartData,
-      median: this.calculateMedian(numericAnswers),
     }
   }
 
@@ -183,12 +182,6 @@ export class SurveyAnalytics {
         }
       })
       .sort((a, b) => a.averagePosition - b.averagePosition)
-  }
-
-  private static calculateMedian(numbers: number[]): number {
-    const sorted = [...numbers].sort((a, b) => a - b)
-    const mid = Math.floor(sorted.length / 2)
-    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
   }
 
   // Método atualizado para calcular média de satisfação

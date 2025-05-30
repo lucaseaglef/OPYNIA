@@ -1,27 +1,18 @@
 "use client"
 
 import type React from "react"
-import { Inter } from "next/font/google"
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  display: "swap",
-})
+import { ThemeProvider } from "@/components/theme-provider"
+import { LayoutWrapper } from "@/components/layout-wrapper"
 
-export default function ClientLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
-      <head>
-        <title>Opynia - Plataforma de Pesquisas FEIND</title>
-        <meta name="description" content="Plataforma oficial de pesquisas de satisfação da FEIND 2025" />
-        <link rel="icon" href="/favicon.ico" />
-      </head>
-      <body className={inter.className}>{children}</body>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+          <LayoutWrapper>{children}</LayoutWrapper>
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

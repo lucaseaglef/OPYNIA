@@ -271,7 +271,24 @@ export class DatabaseService {
     try {
       const answersJson = JSON.stringify(response.answers)
 
-      await sql`
+      // Check for recent duplicate content from the same IP for the same survey
+      const duplicateCheck = await sql`
+        SELECT id FROM surveys.survey_responses
+        WHERE survey_id = ${response.surveyId}
+          AND answers = ${answersJson}::jsonb
+          AND ip_address = ${ipAddress || null}
+          AND submitted_at >= NOW() - INTERVAL '1 minute' -- Check for submissions in the last minute
+        LIMIT 1;
+      `
+
+      if (duplicateCheck.length > 0) {
+        console.warn(
+          `Recent duplicate response content from IP ${ipAddress} for survey ${response.surveyId}. Existing ID: ${duplicateCheck[0].id}. New attempt ID: ${response.id}. Preventing save.`,
+        )
+        return true // Indicate success to client to avoid error, but don't save duplicate
+      }
+
+      const result = await sql`
         INSERT INTO surveys.survey_responses (
           id, survey_id, answers, submitted_at, user_agent, ip_address
         ) VALUES (
@@ -282,8 +299,18 @@ export class DatabaseService {
           ${response.userAgent || ""},
           ${ipAddress || null}
         )
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id; -- Return id if inserted, null/empty if conflict
       `
-      return true
+      // Check if insert happened
+      if (result.length > 0 && result[0].id === response.id) {
+        console.log(`✅ Response ${response.id} saved for survey ${response.surveyId}`)
+      } else {
+        console.warn(
+          `Response ${response.id} for survey ${response.surveyId} was not inserted (possibly due to ID conflict or other reason).`,
+        )
+      }
+      return true // Always return true to client for better UX on resubmits/duplicates
     } catch (error) {
       console.error("Error saving response:", error)
       return false

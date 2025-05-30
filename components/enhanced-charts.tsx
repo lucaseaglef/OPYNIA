@@ -12,52 +12,45 @@ import {
   PieChart as RechartsPieChart,
   Pie,
   Cell,
-  Area,
-  AreaChart,
   LineChart,
   Line,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
+  Area,
+  AreaChart,
 } from "recharts"
-import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart3, Eye, Table } from "lucide-react"
+import { BarChart3, Eye, TrendingUp, Users } from "lucide-react"
+import type { SurveyResponse } from "@/types/survey"
 
 const COLORS = [
-  "#3B82F6",
-  "#10B981",
-  "#F59E0B",
-  "#EF4444",
-  "#8B5CF6",
-  "#06B6D4",
-  "#84CC16",
-  "#F97316",
-  "#EC4899",
-  "#6366F1",
+  "#F59E0B", // Orange primary
+  "#3B82F6", // Blue
+  "#10B981", // Emerald
+  "#EF4444", // Red
+  "#8B5CF6", // Purple
+  "#06B6D4", // Cyan
+  "#84CC16", // Lime
+  "#F97316", // Orange variant
+  "#EC4899", // Pink
+  "#6366F1", // Indigo
 ]
 
 interface EnhancedChartsProps {
   field: any
   analytics: any
-  responses: any[]
+  responses: SurveyResponse[]
   survey: any
+  onResponseClick?: (response: SurveyResponse) => void
 }
 
-export function EnhancedCharts({ field, analytics, responses, survey }: EnhancedChartsProps) {
-  const [viewMode, setViewMode] = useState<"chart" | "table" | "individual">("chart")
-
-  const chartTitle = field.label
-  const chartDescription = `${responses.filter((r) => r.answers[field.id]).length} respostas coletadas`
+export function EnhancedCharts({ field, analytics, responses, survey, onResponseClick }: EnhancedChartsProps) {
+  const [viewMode, setViewMode] = useState<"insights" | "individual">("insights")
 
   const renderIndividualResponses = () => {
     const fieldResponses = responses
       .map((r, index) => {
-        // Encontrar o nome do respondente
         let respondentName = "Anônimo"
         for (const fieldId in r.answers) {
           const surveyField = survey.fields.find((f) => f.id === fieldId)
@@ -68,84 +61,59 @@ export function EnhancedCharts({ field, analytics, responses, survey }: Enhanced
         }
 
         return {
-          responseId: r.id,
+          response: r,
           responseIndex: index + 1,
           answer: r.answers[field.id],
-          submittedAt: r.submittedAt,
           respondentName: respondentName,
         }
       })
       .filter((r) => r.answer !== undefined && r.answer !== null && r.answer !== "")
 
     return (
-      <div className="space-y-3 max-h-96 overflow-y-auto">
-        {fieldResponses.map((response, index) => (
+      <div className="space-y-3 max-h-80 overflow-y-auto">
+        {fieldResponses.map((item) => (
           <div
-            key={response.responseId}
-            className="p-4 bg-[#1e293b] rounded-lg border border-gray-700/50 hover:bg-[#2a3548] transition-all duration-300"
+            key={item.response.id}
+            onClick={() => onResponseClick?.(item.response)}
+            className="p-4 bg-slate-800/30 rounded-lg border border-slate-700/50 hover:bg-slate-700/30 hover:border-orange-500/30 transition-all duration-200 cursor-pointer group"
           >
-            <div className="flex items-start justify-between mb-3">
+            <div className="flex items-start justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-bold">
-                  {response.responseIndex}
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-white flex items-center justify-center text-sm font-bold">
+                  {item.responseIndex}
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-white">{response.respondentName}</div>
-                  <div className="text-xs text-gray-400">{new Date(response.submittedAt).toLocaleString("pt-BR")}</div>
+                  <div className="text-sm font-medium text-white group-hover:text-orange-400 transition-colors">
+                    {item.respondentName}
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {new Date(item.response.submittedAt).toLocaleDateString("pt-BR")}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="ml-11">
-              {field.type === "stars" && (
-                <div className="flex items-center space-x-2">
-                  <div className="flex space-x-1">
+              <div className="text-right">
+                {field.type === "stars" && (
+                  <div className="flex items-center space-x-1">
                     {Array.from({ length: field.max || 5 }, (_, i) => (
-                      <span key={i} className={`text-lg ${i < response.answer ? "text-amber-400" : "text-gray-600"}`}>
+                      <span key={i} className={`text-sm ${i < item.answer ? "text-amber-400" : "text-slate-600"}`}>
                         ★
                       </span>
                     ))}
                   </div>
-                  <span className="text-sm font-medium text-gray-300">
-                    {response.answer} de {field.max || 5} estrelas
-                  </span>
-                </div>
-              )}
+                )}
 
-              {field.type === "numeric" && (
-                <div className="flex items-center space-x-3">
-                  <div className="text-2xl font-bold text-blue-400">{response.answer}</div>
-                  <div className="text-sm text-gray-400">
-                    de {field.min || 0} a {field.max || 10}
-                  </div>
-                </div>
-              )}
+                {field.type === "numeric" && <div className="text-lg font-bold text-blue-400">{item.answer}</div>}
 
-              {["radio", "dropdown"].includes(field.type) && (
-                <Badge className="bg-blue-500/20 text-blue-300 border border-blue-500/30">{response.answer}</Badge>
-              )}
+                {["radio", "dropdown"].includes(field.type) && (
+                  <Badge className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs">
+                    {item.answer}
+                  </Badge>
+                )}
 
-              {field.type === "checkbox" && Array.isArray(response.answer) && (
-                <div className="flex flex-wrap gap-2">
-                  {response.answer.map((item, i) => (
-                    <Badge key={i} className="bg-green-500/20 text-green-300 border border-green-500/30">
-                      {item}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
-              {["text", "textarea"].includes(field.type) && (
-                <div className="text-gray-300 leading-relaxed bg-gray-700/30 p-3 rounded-lg border border-gray-600">
-                  {response.answer}
-                </div>
-              )}
-
-              {field.type === "likert" && (
-                <Badge className="bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                  {response.answer}
-                </Badge>
-              )}
+                {field.type === "checkbox" && Array.isArray(item.answer) && (
+                  <div className="text-xs text-slate-400">{item.answer.length} seleções</div>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -153,324 +121,206 @@ export function EnhancedCharts({ field, analytics, responses, survey }: Enhanced
     )
   }
 
-  const renderDataTable = () => {
-    if (!analytics || !Array.isArray(analytics)) return null
-
-    return (
-      <div className="overflow-hidden rounded-lg border border-gray-700">
-        <table className="w-full">
-          <thead className="bg-gray-700/50">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-200">Opção</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-200">Respostas</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-200">Percentual</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-200">Barra</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-700">
-            {analytics.map((item: any, index: number) => (
-              <tr key={index} className="hover:bg-gray-700/30">
-                <td className="px-4 py-3 text-sm text-gray-200 font-medium">{item.name}</td>
-                <td className="px-4 py-3 text-center text-sm font-bold text-white">{item.value}</td>
-                <td className="px-4 py-3 text-center">
-                  <Badge
-                    variant="outline"
-                    style={{
-                      backgroundColor: COLORS[index % COLORS.length] + "20",
-                      color: COLORS[index % COLORS.length],
-                      borderColor: COLORS[index % COLORS.length] + "40",
-                    }}
-                  >
-                    {item.percentage}%
-                  </Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="w-full bg-gray-600 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${item.percentage}%`,
-                        backgroundColor: COLORS[index % COLORS.length],
-                      }}
-                    />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )
-  }
-
-  const renderCharts = () => {
+  const renderInsights = () => {
     if (!analytics) return null
 
     switch (field.type) {
       case "radio":
       case "dropdown":
         return (
-          <Tabs defaultValue="bar" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-gray-700/50">
-              <TabsTrigger value="bar" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                Barras
-              </TabsTrigger>
-              <TabsTrigger value="pie" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                Pizza
-              </TabsTrigger>
-              <TabsTrigger value="donut" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                Rosca
-              </TabsTrigger>
-              <TabsTrigger value="radar" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                Radar
-              </TabsTrigger>
-            </TabsList>
+          <div className="space-y-6">
+            {/* Métricas principais */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/50">
+                <div className="flex items-center space-x-2 mb-2">
+                  <TrendingUp className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-medium text-slate-300">Mais Popular</span>
+                </div>
+                <p className="text-lg font-bold text-white">{analytics[0]?.name || "N/A"}</p>
+                <p className="text-xs text-slate-400">{analytics[0]?.percentage || 0}% das respostas</p>
+              </div>
+              <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/50">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Users className="w-4 h-4 text-green-400" />
+                  <span className="text-sm font-medium text-slate-300">Total de Opções</span>
+                </div>
+                <p className="text-lg font-bold text-white">{analytics.length}</p>
+                <p className="text-xs text-slate-400">Opções selecionadas</p>
+              </div>
+            </div>
 
-            <TabsContent value="bar" className="mt-6">
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={analytics} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 12, fill: "#9CA3AF" }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={80}
-                  />
-                  <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid #374151",
-                      borderRadius: "12px",
-                      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
-                      color: "#F9FAFB",
-                    }}
-                    formatter={(value, name) => [
-                      `${value} respostas (${analytics.find((d) => d.value === value)?.percentage}%)`,
-                      "Quantidade",
-                    ]}
-                  />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                    {analytics.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </TabsContent>
+            {/* Gráficos */}
+            <Tabs defaultValue="bar" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-slate-800/50 h-9">
+                <TabsTrigger
+                  value="bar"
+                  className="data-[state=active]:bg-orange-500 data-[state=active]:text-white text-xs"
+                >
+                  Barras
+                </TabsTrigger>
+                <TabsTrigger
+                  value="pie"
+                  className="data-[state=active]:bg-orange-500 data-[state=active]:text-white text-xs"
+                >
+                  Pizza
+                </TabsTrigger>
+                <TabsTrigger
+                  value="line"
+                  className="data-[state=active]:bg-orange-500 data-[state=active]:text-white text-xs"
+                >
+                  Tendência
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="pie" className="mt-6">
-              <ResponsiveContainer width="100%" height={400}>
-                <RechartsPieChart>
-                  <Pie
-                    data={analytics}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percentage }) => `${name}: ${percentage}%`}
-                    outerRadius={120}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {analytics.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid #374151",
-                      borderRadius: "12px",
-                      color: "#F9FAFB",
-                    }}
-                    formatter={(value, name) => [`${value} respostas`, name]}
-                  />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </TabsContent>
+              <TabsContent value="bar" className="mt-4">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={analytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 11, fill: "#94A3B8" }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#1E293B",
+                        border: "1px solid #475569",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        color: "#F1F5F9",
+                      }}
+                      formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, "Respostas"]}
+                    />
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                      {analytics.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </TabsContent>
 
-            <TabsContent value="donut" className="mt-6">
-              <ResponsiveContainer width="100%" height={400}>
-                <RechartsPieChart>
-                  <Pie
-                    data={analytics}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percentage }) => `${percentage}%`}
-                    outerRadius={120}
-                    innerRadius={60}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {analytics.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid #374151",
-                      borderRadius: "12px",
-                      color: "#F9FAFB",
-                    }}
-                    formatter={(value, name) => [`${value} respostas`, name]}
-                  />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </TabsContent>
+              <TabsContent value="pie" className="mt-4">
+                <ResponsiveContainer width="100%" height={300}>
+                  <RechartsPieChart>
+                    <Pie
+                      data={analytics}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ percentage }) => `${percentage}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {analytics.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#1E293B",
+                        border: "1px solid #475569",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        color: "#F1F5F9",
+                      }}
+                      formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, name]}
+                    />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              </TabsContent>
 
-            <TabsContent value="radar" className="mt-6">
-              <ResponsiveContainer width="100%" height={400}>
-                <RadarChart data={analytics}>
-                  <PolarGrid stroke="#374151" />
-                  <PolarAngleAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                  <PolarRadiusAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} />
-                  <Radar
-                    name="Respostas"
-                    dataKey="value"
-                    stroke="#F59E0B"
-                    fill="#F59E0B"
-                    fillOpacity={0.3}
-                    strokeWidth={2}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid #374151",
-                      borderRadius: "12px",
-                      color: "#F9FAFB",
-                    }}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="line" className="mt-4">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analytics}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#1E293B",
+                        border: "1px solid #475569",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        color: "#F1F5F9",
+                      }}
+                      formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, "Respostas"]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#F59E0B"
+                      strokeWidth={3}
+                      dot={{ fill: "#F59E0B", strokeWidth: 2, r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </TabsContent>
+            </Tabs>
+          </div>
         )
 
       case "stars":
         return (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {/* Métricas principais */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div className="text-center p-6 bg-blue-500/10 rounded-2xl border border-blue-500/20 hover:bg-blue-500/20 transition-all duration-500">
-                <div className="text-4xl font-bold text-blue-400 mb-2">{analytics.average?.toFixed(1)}</div>
-                <div className="text-sm text-blue-300 font-semibold mb-3">Média</div>
-                <div className="flex justify-center mt-3">
-                  {Array.from({ length: Math.round(analytics.average || 0) }, (_, i) => (
-                    <span key={i} className="text-amber-400 text-xl">
-                      ★
-                    </span>
-                  ))}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-amber-500/10 to-amber-600/10 rounded-lg p-4 border border-amber-500/30">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-amber-400 mb-1">{analytics.average?.toFixed(1)}</div>
+                  <div className="text-xs text-amber-300 font-medium">Média</div>
+                  <div className="flex justify-center mt-2">
+                    {Array.from({ length: Math.round(analytics.average || 0) }, (_, i) => (
+                      <span key={i} className="text-amber-400 text-sm">
+                        ★
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div className="text-center p-6 bg-green-500/10 rounded-2xl border border-green-500/20 hover:bg-green-500/20 transition-all duration-500">
-                <div className="text-4xl font-bold text-green-400 mb-2">{analytics.min}</div>
-                <div className="text-sm text-green-300 font-semibold">Mínimo</div>
+              <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 rounded-lg p-4 border border-green-500/30">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-400 mb-1">{analytics.min}</div>
+                  <div className="text-xs text-green-300 font-medium">Mínimo</div>
+                </div>
               </div>
-              <div className="text-center p-6 bg-orange-500/10 rounded-2xl border border-orange-500/20 hover:bg-orange-500/20 transition-all duration-500">
-                <div className="text-4xl font-bold text-orange-400 mb-2">{analytics.max}</div>
-                <div className="text-sm text-orange-300 font-semibold">Máximo</div>
-              </div>
-              <div className="text-center p-6 bg-purple-500/10 rounded-2xl border border-purple-500/20 hover:bg-purple-500/20 transition-all duration-500">
-                <div className="text-4xl font-bold text-purple-400 mb-2">{analytics.median?.toFixed(1)}</div>
-                <div className="text-sm text-purple-300 font-semibold">Mediana</div>
+              <div className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 rounded-lg p-4 border border-orange-500/30">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-400 mb-1">{analytics.max}</div>
+                  <div className="text-xs text-orange-300 font-medium">Máximo</div>
+                </div>
               </div>
             </div>
 
-            {/* Gráfico de distribuição */}
+            {/* Distribuição */}
             {analytics.distribution && (
-              <div className="bg-[#1e293b] rounded-xl p-6 border border-gray-700/50">
-                <h3 className="text-xl text-white font-bold mb-6">Distribuição das Avaliações</h3>
-                <Tabs defaultValue="bar" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 bg-gray-700/50">
-                    <TabsTrigger
-                      value="bar"
-                      className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
-                    >
-                      Barras
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="area"
-                      className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
-                    >
-                      Área
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="line"
-                      className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
-                    >
-                      Linha
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="bar" className="mt-8">
-                    <ResponsiveContainer width="100%" height={350}>
-                      <BarChart data={analytics.distribution}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                        <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                        <Tooltip
-                          formatter={(value, name) => [`${value} respostas`, `${name} estrelas`]}
-                          contentStyle={{
-                            backgroundColor: "#1F2937",
-                            border: "1px solid #374151",
-                            borderRadius: "12px",
-                            color: "#F9FAFB",
-                          }}
-                        />
-                        <Bar dataKey="value" fill="#F59E0B" radius={[8, 8, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </TabsContent>
-
-                  <TabsContent value="area" className="mt-8">
-                    <ResponsiveContainer width="100%" height={350}>
-                      <AreaChart data={analytics.distribution}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                        <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                        <Tooltip
-                          formatter={(value, name) => [`${value} respostas`, `${name} estrelas`]}
-                          contentStyle={{
-                            backgroundColor: "#1F2937",
-                            border: "1px solid #374151",
-                            borderRadius: "12px",
-                            color: "#F9FAFB",
-                          }}
-                        />
-                        <Area type="monotone" dataKey="value" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.3} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </TabsContent>
-
-                  <TabsContent value="line" className="mt-8">
-                    <ResponsiveContainer width="100%" height={350}>
-                      <LineChart data={analytics.distribution}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                        <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                        <Tooltip
-                          formatter={(value, name) => [`${value} respostas`, `${name} estrelas`]}
-                          contentStyle={{
-                            backgroundColor: "#1F2937",
-                            border: "1px solid #374151",
-                            borderRadius: "12px",
-                            color: "#F9FAFB",
-                          }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="value"
-                          stroke="#F59E0B"
-                          strokeWidth={4}
-                          dot={{ fill: "#F59E0B", strokeWidth: 2, r: 8 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </TabsContent>
-                </Tabs>
+              <div>
+                <h4 className="text-sm font-medium text-slate-300 mb-4">Distribuição das Avaliações</h4>
+                <ResponsiveContainer width="100%" height={250}>
+                  <AreaChart data={analytics.distribution}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <Tooltip
+                      formatter={(value, name, props) => [
+                        `${value} (${props.payload.percentage}%)`,
+                        `${name} estrelas`,
+                      ]}
+                      contentStyle={{
+                        backgroundColor: "#1E293B",
+                        border: "1px solid #475569",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        color: "#F1F5F9",
+                      }}
+                    />
+                    <Area type="monotone" dataKey="value" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.3} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             )}
           </div>
@@ -480,93 +330,80 @@ export function EnhancedCharts({ field, analytics, responses, survey }: Enhanced
         return (
           <div className="space-y-6">
             {/* Métricas principais */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                <div className="text-3xl font-bold text-blue-400 mb-1">{analytics.average?.toFixed(1)}</div>
-                <div className="text-sm text-blue-300 font-medium">Média</div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 rounded-lg p-4 border border-blue-500/30">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-400 mb-1">{analytics.average?.toFixed(1)}</div>
+                  <div className="text-xs text-blue-300 font-medium">Média</div>
+                </div>
               </div>
-              <div className="text-center p-4 bg-green-500/10 rounded-xl border border-green-500/20">
-                <div className="text-3xl font-bold text-green-400 mb-1">{analytics.min}</div>
-                <div className="text-sm text-green-300 font-medium">Mínimo</div>
+              <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 rounded-lg p-4 border border-green-500/30">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-400 mb-1">{analytics.min}</div>
+                  <div className="text-xs text-green-300 font-medium">Mínimo</div>
+                </div>
               </div>
-              <div className="text-center p-4 bg-orange-500/10 rounded-xl border border-orange-500/20">
-                <div className="text-3xl font-bold text-orange-400 mb-1">{analytics.max}</div>
-                <div className="text-sm text-orange-300 font-medium">Máximo</div>
-              </div>
-              <div className="text-center p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
-                <div className="text-3xl font-bold text-purple-400 mb-1">{analytics.median?.toFixed(1)}</div>
-                <div className="text-sm text-purple-300 font-medium">Mediana</div>
+              <div className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 rounded-lg p-4 border border-orange-500/30">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-400 mb-1">{analytics.max}</div>
+                  <div className="text-xs text-orange-300 font-medium">Máximo</div>
+                </div>
               </div>
             </div>
 
-            {/* Gráfico de distribuição */}
+            {/* Distribuição */}
             {analytics.distribution && (
-              <ResponsiveContainer width="100%" height={350}>
-                <AreaChart data={analytics.distribution}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                  <YAxis tick={{ fontSize: 12, fill: "#9CA3AF" }} />
-                  <Tooltip
-                    formatter={(value, name) => [`${value} respostas`, `Valor ${name}`]}
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid #374151",
-                      borderRadius: "12px",
-                      color: "#F9FAFB",
-                    }}
-                  />
-                  <Area type="monotone" dataKey="value" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.3} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div>
+                <h4 className="text-sm font-medium text-slate-300 mb-4">Distribuição dos Valores</h4>
+                <ResponsiveContainer width="100%" height={250}>
+                  <AreaChart data={analytics.distribution}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <Tooltip
+                      formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, `Valor ${name}`]}
+                      contentStyle={{
+                        backgroundColor: "#1E293B",
+                        border: "1px solid #475569",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        color: "#F1F5F9",
+                      }}
+                    />
+                    <Area type="monotone" dataKey="value" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.3} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
         )
 
       default:
-        return null
+        return (
+          <div className="text-center py-8">
+            <p className="text-slate-400">Insights não disponíveis para este tipo de campo.</p>
+          </div>
+        )
     }
   }
 
   return (
-    <div className="bg-[#1a2332] rounded-xl border border-gray-700/50 overflow-hidden">
-      <CardHeader className="bg-gray-700/30 border-b border-gray-600/50">
+    <div className="bg-gradient-to-br from-slate-800/30 to-slate-900/30 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="p-4 bg-slate-700/20 border-b border-slate-600/50">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-orange-400" />
-            </div>
-            <div>
-              <CardTitle className="text-lg text-white">{chartTitle}</CardTitle>
-              <div className="text-sm text-gray-400">{chartDescription}</div>
-            </div>
-          </div>
-
           <div className="flex items-center space-x-2">
             <Button
-              variant={viewMode === "chart" ? "default" : "outline"}
+              variant={viewMode === "insights" ? "default" : "outline"}
               size="sm"
-              onClick={() => setViewMode("chart")}
+              onClick={() => setViewMode("insights")}
               className={
-                viewMode === "chart"
-                  ? "bg-orange-500 hover:bg-orange-600 text-white"
-                  : "bg-gray-700 hover:bg-gray-600 text-gray-300 border-gray-600"
+                viewMode === "insights"
+                  ? "bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white h-8 px-4 text-xs"
+                  : "bg-slate-700/50 hover:bg-slate-600 text-slate-300 border-slate-600 h-8 px-4 text-xs"
               }
             >
-              <BarChart3 className="w-4 h-4 mr-1" />
-              Gráficos
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("table")}
-              className={
-                viewMode === "table"
-                  ? "bg-orange-500 hover:bg-orange-600 text-white"
-                  : "bg-gray-700 hover:bg-gray-600 text-gray-300 border-gray-600"
-              }
-            >
-              <Table className="w-4 h-4 mr-1" />
-              Tabela
+              <BarChart3 className="w-3 h-3 mr-1" />
+              Insights
             </Button>
             <Button
               variant={viewMode === "individual" ? "default" : "outline"}
@@ -574,20 +411,19 @@ export function EnhancedCharts({ field, analytics, responses, survey }: Enhanced
               onClick={() => setViewMode("individual")}
               className={
                 viewMode === "individual"
-                  ? "bg-orange-500 hover:bg-orange-600 text-white"
-                  : "bg-gray-700 hover:bg-gray-600 text-gray-300 border-gray-600"
+                  ? "bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white h-8 px-4 text-xs"
+                  : "bg-slate-700/50 hover:bg-slate-600 text-slate-300 border-slate-600 h-8 px-4 text-xs"
               }
             >
-              <Eye className="w-4 h-4 mr-1" />
-              Individual
+              <Eye className="w-3 h-3 mr-1" />
+              Respostas
             </Button>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-6 bg-[#1a2332]">
-        {viewMode === "chart" && renderCharts()}
-        {viewMode === "table" && renderDataTable()}
+      <CardContent className="p-6">
+        {viewMode === "insights" && renderInsights()}
         {viewMode === "individual" && renderIndividualResponses()}
       </CardContent>
     </div>
