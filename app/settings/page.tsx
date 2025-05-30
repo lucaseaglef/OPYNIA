@@ -148,46 +148,22 @@ export default function SettingsPage() {
 
   const loadUsers = async () => {
     try {
-      // Simular dados para demonstração
-      const mockUsers: AdminUser[] = [
-        {
-          id: "1",
-          name: "João Silva",
-          email: "joao@empresa.com",
-          role: "super_admin",
-          permissions: {
-            createSurveys: true,
-            editSurveys: true,
-            deleteSurveys: true,
-            viewResponses: true,
-            exportData: true,
-            manageUsers: true,
-          },
-          createdAt: "2024-01-15T10:00:00Z",
-          lastLogin: "2024-01-20T14:30:00Z",
-          isActive: true,
-        },
-        {
-          id: "2",
-          name: "Maria Santos",
-          email: "maria@empresa.com",
-          role: "admin",
-          permissions: {
-            createSurveys: true,
-            editSurveys: true,
-            deleteSurveys: false,
-            viewResponses: true,
-            exportData: true,
-            manageUsers: false,
-          },
-          createdAt: "2024-01-16T09:00:00Z",
-          lastLogin: "2024-01-19T16:45:00Z",
-          isActive: true,
-        },
-      ]
-      setUsers(mockUsers)
+      setLoading(true)
+      const response = await fetch('/api/users')
+      const data = await response.json()
+      
+      if (response.ok) {
+        setUsers(data.users || [])
+        console.log(`✅ ${data.users?.length || 0} usuários carregados`)
+      } else {
+        console.error("Erro ao carregar usuários:", data.error)
+        alert(`Erro ao carregar usuários: ${data.error}`)
+      }
     } catch (error) {
       console.error("Erro ao carregar usuários:", error)
+      alert("Erro ao carregar usuários. Verifique sua conexão.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -256,33 +232,69 @@ export default function SettingsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      setLoading(true)
+      
       if (editingUser) {
-        const updatedUsers = users.map((user) =>
-          user.id === editingUser.id
-            ? {
-                ...user,
-                name: formData.name,
-                email: formData.email,
-                role: formData.role,
-                permissions: formData.permissions,
-                isActive: formData.isActive,
-              }
-            : user,
-        )
-        setUsers(updatedUsers)
-      } else {
-        const newUser: AdminUser = {
-          id: Date.now().toString(),
-          name: formData.name,
-          email: formData.email,
-          role: formData.role,
-          permissions: formData.permissions,
-          createdAt: new Date().toISOString(),
-          isActive: formData.isActive,
+        // Atualizar usuário existente
+        const response = await fetch(`/api/users/${editingUser.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            role: formData.role,
+            permissions: formData.permissions,
+            isActive: formData.isActive,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (response.ok) {
+          console.log(`✅ Usuário ${editingUser.id} atualizado`)
+          alert("Usuário atualizado com sucesso!")
+          await loadUsers() // Recarregar lista
+        } else {
+          console.error("Erro ao atualizar usuário:", data.error)
+          alert(`Erro ao atualizar usuário: ${data.error}`)
         }
-        setUsers([...users, newUser])
+      } else {
+        // Criar novo usuário
+        if (!formData.password) {
+          alert("Senha é obrigatória para novos usuários")
+          return
+        }
+
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+            role: formData.role,
+            permissions: formData.permissions,
+            isActive: formData.isActive,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (response.ok) {
+          console.log(`✅ Usuário ${data.user.email} criado`)
+          alert("Usuário criado com sucesso!")
+          await loadUsers() // Recarregar lista
+        } else {
+          console.error("Erro ao criar usuário:", data.error)
+          alert(`Erro ao criar usuário: ${data.error}`)
+        }
       }
 
+      // Resetar formulário
       setFormData({
         name: "",
         email: "",
@@ -302,6 +314,9 @@ export default function SettingsPage() {
       setIsDialogOpen(false)
     } catch (error) {
       console.error("Erro ao salvar usuário:", error)
+      alert("Erro ao salvar usuário. Tente novamente.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -319,8 +334,31 @@ export default function SettingsPage() {
   }
 
   const handleDelete = async (userId: string) => {
-    if (confirm("Tem certeza que deseja excluir este usuário?")) {
-      setUsers(users.filter((user) => user.id !== userId))
+    if (!confirm("Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.")) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        console.log(`✅ Usuário ${userId} deletado`)
+        alert("Usuário deletado com sucesso!")
+        await loadUsers() // Recarregar lista
+      } else {
+        console.error("Erro ao deletar usuário:", data.error)
+        alert(`Erro ao deletar usuário: ${data.error}`)
+      }
+    } catch (error) {
+      console.error("Erro ao deletar usuário:", error)
+      alert("Erro ao deletar usuário. Tente novamente.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -675,11 +713,16 @@ export default function SettingsPage() {
                                 setIsDialogOpen(false)
                                 setEditingUser(null)
                               }}
+                              disabled={loading}
                             >
                               Cancelar
                             </Button>
-                            <Button type="submit" className="bg-orange-500 hover:bg-orange-600">
-                              {editingUser ? "Atualizar" : "Criar"} Usuário
+                            <Button 
+                              type="submit" 
+                              className="bg-orange-500 hover:bg-orange-600"
+                              disabled={loading}
+                            >
+                              {loading ? "Salvando..." : (editingUser ? "Atualizar" : "Criar")} Usuário
                             </Button>
                           </div>
                         </form>
@@ -688,52 +731,71 @@ export default function SettingsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {users.map((user) => (
-                      <div
-                        key={user.id}
-                        className="flex items-center justify-between p-4 bg-[#1e293b] rounded-lg border border-gray-700/50"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-                            <User className="h-5 w-5 text-orange-400" />
+                  {loading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                      <span className="ml-2 text-gray-400">Carregando usuários...</span>
+                    </div>
+                  ) : users.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Nenhum usuário encontrado</p>
+                      <p className="text-sm">Clique em "Novo Usuário" para adicionar o primeiro usuário</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {users.map((user) => (
+                        <div
+                          key={user.id}
+                          className="flex items-center justify-between p-4 bg-[#1e293b] rounded-lg border border-gray-700/50"
+                        >
+                          <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                              <User className="h-5 w-5 text-orange-400" />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-white">{user.name}</h3>
+                              <p className="text-sm text-gray-400">{user.email}</p>
+                              {user.lastLogin && (
+                                <p className="text-xs text-gray-500">
+                                  Último login: {new Date(user.lastLogin).toLocaleString("pt-BR")}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="font-medium text-white">{user.name}</h3>
-                            <p className="text-sm text-gray-400">{user.email}</p>
-                            {user.lastLogin && (
-                              <p className="text-xs text-gray-500">
-                                Último login: {new Date(user.lastLogin).toLocaleString("pt-BR")}
-                              </p>
-                            )}
-                          </div>
-                        </div>
 
-                        <div className="flex items-center space-x-4">
-                          <Badge className={roleColors[user.role]}>{roleLabels[user.role]}</Badge>
-                          <Badge
-                            className={user.isActive ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}
-                          >
-                            {user.isActive ? "Ativo" : "Inativo"}
-                          </Badge>
-
-                          <div className="flex space-x-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(user.id)}
-                              className="text-red-400 hover:text-red-300"
+                          <div className="flex items-center space-x-4">
+                            <Badge className={roleColors[user.role]}>{roleLabels[user.role]}</Badge>
+                            <Badge
+                              className={user.isActive ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              {user.isActive ? "Ativo" : "Inativo"}
+                            </Badge>
+
+                            <div className="flex space-x-2">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleEdit(user)}
+                                disabled={loading}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(user.id)}
+                                className="text-red-400 hover:text-red-300"
+                                disabled={loading}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
